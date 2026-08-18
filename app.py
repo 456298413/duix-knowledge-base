@@ -13,7 +13,7 @@ app = Flask(__name__)
 CORS(app)  # 允许所有跨域请求
 
 # 加载知识库
-KB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'knowledge_base', 'knowledge_base.json')
+KB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'knowledge_base.json')
 
 with open(KB_PATH, 'r', encoding='utf-8') as f:
     KB = json.load(f)
