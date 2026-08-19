@@ -9,7 +9,17 @@ import asyncio
 app = Flask(__name__)
 CORS(app)
 
-KB_PATH = os.path.join(os.path.dirname(__file__), 'knowledge_base.json')
+_base_dir = os.path.dirname(os.path.abspath(__file__))
+for kb_path in [
+    os.path.join(_base_dir, 'knowledge_base.json'),
+    os.path.join(_base_dir, 'knowledge_base', 'knowledge_base.json'),
+]:
+    if os.path.exists(kb_path):
+        KB_PATH = kb_path
+        break
+else:
+    KB_PATH = os.path.join(_base_dir, 'knowledge_base.json')
+
 with open(KB_PATH, 'r', encoding='utf-8') as f:
     kb_data = json.load(f)
 knowledge_base = kb_data['entries']
