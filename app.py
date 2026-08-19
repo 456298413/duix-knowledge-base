@@ -79,7 +79,7 @@ TOPIC_CATEGORIES = {
             ('子女入学', 12), ('助学', 10), ('生日', 10),
             ('生病', 10), ('住院', 10), ('医疗', 10),
             ('困难', 10), ('帮扶', 10), ('受灾', 10),
-            ('亲人去世', 12), ('去世', 8),
+            ('亲人去世', 15), ('去世', 12),
             ('退休', 10), ('离岗', 10),
             ('年节', 10), ('节日', 10), ('春节', 8),
             ('元旦', 8), ('慰问品', 10), ('慰问金', 10),
@@ -247,8 +247,8 @@ def score_entry(question, entry):
     return score
 
 
-def find_best_entry(question, filter_fn=None, max_results=3):
-    """找到最佳匹配条目（每个来源只取最好的一个）"""
+def find_best_entry(question, filter_fn=None, max_results=1):
+    """找到最佳匹配条目（默认只返回最匹配的一条）"""
     scored = []
     for entry in ENTRIES:
         if filter_fn and not filter_fn(entry):
@@ -262,33 +262,43 @@ def find_best_entry(question, filter_fn=None, max_results=3):
             scored.append((s, entry))
     scored.sort(key=lambda x: -x[0])
 
-    seen_sources = set()
+    # 只取分数最高的条目（默认 max_results=1）
     results = []
-    for s, entry in scored:
-        source = entry.get('source_file', '')
-        if source not in seen_sources:
-            seen_sources.add(source)
-            results.append((s, entry))
-        if len(results) >= max_results:
-            break
+    for s, entry in scored[:max_results]:
+        results.append((s, entry))
     return results
 
 
 def find_entry_by_subtopic(sub_key):
     """按子主题关键词查找具体条目"""
+    # 先检查是否是澄清菜单里的key
     for cat, menu in CLARIFY_MENUS.items():
         for item in menu['items']:
             if item['key'] == sub_key:
                 label = item['label']
+                # 标题包含匹配（更宽松）
                 for entry in ENTRIES:
-                    if label in entry.get('title', '') and len(entry.get('content', '')) > 50:
+                    title = entry.get('title', '')
+                    if label in title and len(entry.get('content', '')) > 50:
                         return entry
+                # 标题包含关键词的任意部分
+                label_parts = re.findall(r'[\u4e00-\u9fa5]+', label)
+                for entry in ENTRIES:
+                    title = entry.get('title', '')
+                    if any(p in title for p in label_parts) and len(entry.get('content', '')) > 50:
+                        return entry
+                # 内容匹配
                 for entry in ENTRIES:
                     if label in entry.get('content', '') and len(entry.get('content', '')) > 50:
                         return entry
 
+    # 通用子主题搜索：在标题中搜索
     for entry in ENTRIES:
         if sub_key in entry.get('title', '') and len(entry.get('content', '')) > 30:
+            return entry
+    # 在内容中搜索（取第一条）
+    for entry in ENTRIES:
+        if sub_key in entry.get('content', '') and len(entry.get('content', '')) > 50:
             return entry
     return None
 
@@ -300,6 +310,7 @@ def try_clarify(question, topics, source_filter=None):
 
     top_score = topics[0][1]
 
+    # 多个主题匹配 → 返回主菜单
     if len(topics) >= 2 and not source_filter:
         return {
             'type': 'clarify',
@@ -311,9 +322,11 @@ def try_clarify(question, topics, source_filter=None):
             'source': '知识库',
         }
 
+    # 单个主题
     cat = topics[0][0]
     config = TOPIC_CATEGORIES[cat]
 
+    # 检查是否有子主题匹配
     if 'sub_topics' in config:
         sub_scores = {}
         for sub_name, sub_info in config['sub_topics'].items():
@@ -326,14 +339,17 @@ def try_clarify(question, topics, source_filter=None):
             if best_sub[1] >= 10:
                 entry = find_entry_by_subtopic(best_sub[0])
                 if entry:
+                    # 如果指定了来源文件，检查该条目是否匹配
                     if source_filter:
                         marker = SOURCE_FILE_MAP[source_filter]['marker']
                         if marker in entry.get('source_file', '') or marker in entry.get('source_title', ''):
                             return {'type': 'answer', 'entry': entry}
                         else:
+                            # 指定了来源但条目不匹配，在指定来源中搜索
                             return None
                     return {'type': 'answer', 'entry': entry}
 
+        # 没有具体子主题匹配 → 返回子主题菜单
         menu_config = CLARIFY_MENUS.get(cat)
         if menu_config and not source_filter:
             topic_name = config['name']
@@ -352,43 +368,40 @@ def source_filtered_search(question, source_name):
     marker = SOURCE_FILE_MAP[source_name]['marker']
     full_name = SOURCE_FILE_MAP[source_name]['full_name']
 
+    # 在指定来源的条目中搜索（只取最佳一条）
     filter_fn = lambda e: marker in e.get('source_file', '') or marker in e.get('source_title', '')
-    results = find_best_entry(question, filter_fn=filter_fn, max_results=3)
+    results = find_best_entry(question, filter_fn=filter_fn, max_results=1)
 
     if results:
         top_score, top_entry = results[0]
         if top_score >= 10:
-            parts = []
-            for score, entry in results[:3]:
-                title = entry.get('title', '').strip()
-                content = entry.get('content', '').strip()
-                source = entry.get('source_title', '')
-                parts.append(f"【{title}】\n{content}\n（来源：{source}）")
+            title = top_entry.get('title', '').strip()
+            content = top_entry.get('content', '').strip()
+            source = top_entry.get('source_title', '')
             return {
                 'type': 'detail',
-                'answer': '\n\n'.join(parts)[:3000],
+                'answer': f"【{title}】\n{content}\n（来源：{source}）",
                 'source': full_name,
             }
 
-    main_entries = []
+    # 指定了来源但没找到具体匹配 → 返回该来源的概览菜单
+    menu_items = []
     for entry in ENTRIES:
         if marker in entry.get('source_file', '') or marker in entry.get('source_title', ''):
             if len(entry.get('content', '').strip()) > 50:
                 if not any(b in entry.get('content', '') for b in BLACKLIST):
-                    main_entries.append(entry)
+                    title = entry.get('title', '').strip()
+                    # 提取简短标题
+                    short_title = re.sub(r'^[一二三四五六七八九十]+[、.]\s*', '', title)
+                    if len(short_title) > 20:
+                        short_title = short_title[:20] + '…'
+                    menu_items.append({'label': short_title, 'key': title})
 
-    if main_entries:
-        parts = []
-        for entry in main_entries[:3]:
-            title = entry.get('title', '').strip()
-            content = entry.get('content', '').strip()
-            if len(content) > 500:
-                content = content[:500] + '…'
-            source = entry.get('source_title', '')
-            parts.append(f"【{title}】\n{content}\n（来源：{source}）")
+    if menu_items:
         return {
-            'type': 'detail',
-            'answer': f'以下是「{full_name}」中的主要内容：\n\n' + '\n\n'.join(parts)[:3000],
+            'type': 'clarify',
+            'answer': f'「{full_name}」包含以下内容，请问您想了解哪一条？',
+            'menu_items': menu_items[:8],
             'source': full_name,
         }
 
@@ -396,22 +409,19 @@ def source_filtered_search(question, source_name):
 
 
 def general_search(question):
-    """通用搜索（兜底）"""
-    results = find_best_entry(question)
+    """通用搜索（兜底）— 只返回最匹配的一条"""
+    results = find_best_entry(question, max_results=1)
     if results:
         top_score, top_entry = results[0]
         if top_score < 10:
             return None
-        parts = []
-        for score, entry in results[:3]:
-            title = entry.get('title', '').strip()
-            content = entry.get('content', '').strip()
-            source = entry.get('source_title', '')
-            parts.append(f"【{title}】\n{content}\n（来源：{source}）")
+        title = top_entry.get('title', '').strip()
+        content = top_entry.get('content', '').strip()
+        source = top_entry.get('source_title', '')
         return {
             'type': 'detail',
-            'answer': '\n\n'.join(parts)[:3000],
-            'source': top_entry.get('source_title', ''),
+            'answer': f"【{title}】\n{content}\n（来源：{source}）",
+            'source': source,
         }
     return None
 
@@ -443,6 +453,7 @@ def ask():
         # 0. 检测是否指定了来源文件
         source_filter = detect_source(question)
 
+        # 如果指定了来源文件，优先在指定文件中精确搜索
         if source_filter:
             marker = SOURCE_FILE_MAP[source_filter]['marker']
             filter_fn = lambda e: marker in e.get('source_file', '') or marker in e.get('source_title', '')
@@ -490,7 +501,7 @@ def ask():
         # 1. 检测主题
         topics = detect_topics(question)
 
-        # 2. 尝试澄清
+        # 2. 尝试澄清（模糊问题时返回菜单）
         clarify = try_clarify(question, topics)
         if clarify:
             if clarify.get('type') == 'clarify':
