@@ -556,8 +556,12 @@ function hideBubbles() {
 }
 
 // ===== 语音播报 + 打字机逐字出现 =====
-function speakAndShow(text) {
-  window.speechSynthesis.cancel();
+// warmVoice: 如果传入了在手势上下文中预创建的语音对象，复用它而不是创建新的
+function speakAndShow(text, warmVoice) {
+  // 只有非预热模式才 cancel，避免打断手势上下文中正在播放的语音
+  if (!warmVoice) {
+    window.speechSynthesis.cancel();
+  }
   hideBubbles();
   stopParticles();
   charTimers.forEach(t => clearTimeout(t));
@@ -702,12 +706,21 @@ function speakAndShow(text) {
       elapsed += MS_PER_CHAR;
     }
 
-    // TTS 播报
-    const utter = new SpeechSynthesisUtterance(rText);
-    utter.lang = 'zh-CN';
-    utter.rate = SPEECH_RATE;
-    utter.pitch = 1.1;
-    if (voice) utter.voice = voice;
+    // TTS 播报：第一轮复用预热语音对象（保持在手势上下文），后续轮次正常创建
+    let utter;
+    if (warmVoice && roundIdx === 0) {
+      // 复用预创建对象——它是在手势上下文中创建的，手机上只有它能播放
+      utter = warmVoice;
+      utter.text = rText;
+      // 重新设置 voice（预创建时 voices 可能还没加载好）
+      if (voice) utter.voice = voice;
+    } else {
+      utter = new SpeechSynthesisUtterance(rText);
+      utter.lang = 'zh-CN';
+      utter.rate = SPEECH_RATE;
+      utter.pitch = 1.1;
+      if (voice) utter.voice = voice;
+    }
 
     // 语音开始后启动自动滚动
     utter.onstart = () => { startAutoScroll(); };
@@ -737,7 +750,30 @@ function speakAndShow(text) {
       hideBubbles();
     };
 
+    // 确保引擎活跃后再 speak
+    window.speechSynthesis.resume();
     window.speechSynthesis.speak(utter);
+
+    // 兜底：200ms后如果还没开始播放，用全新 utterance 重试（覆盖部分手机浏览器场景）
+    if (roundIdx === 0) {
+      const onendRef = utter.onend;
+      const onerrorRef = utter.onerror;
+      setTimeout(() => {
+        if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending && isSpeaking) {
+          // 主 utterance 没有成功播放，用 fallback 重试
+          const fb = new SpeechSynthesisUtterance(rText);
+          fb.lang = 'zh-CN';
+          fb.rate = SPEECH_RATE;
+          fb.pitch = 1.1;
+          if (voice) fb.voice = voice;
+          fb.onstart = () => {};
+          fb.onend = onendRef;
+          fb.onerror = onerrorRef;
+          window.speechSynthesis.resume();
+          window.speechSynthesis.speak(fb);
+        }
+      }, 200);
+    }
   }
 
   playRound();
@@ -752,8 +788,10 @@ async function sendMsg() {
   // 在用户点击的同步代码中创建语音对象，解决手机浏览器拦截
   if (window.speechSynthesis) {
     try {
+      // 先 resume 确保引擎处于活跃状态（某些手机浏览器播完后会暂停）
+      window.speechSynthesis.resume();
       window.speechSynthesis.cancel();
-      pendingUtter = new SpeechSynthesisUtterance(' ');
+      pendingUtter = new SpeechSynthesisUtterance('.');
       pendingUtter.lang = 'zh-CN';
       pendingUtter.rate = 0.92;
       pendingUtter.pitch = 1.1;
@@ -814,23 +852,26 @@ async function sendMsg() {
         return;
       }
 
-      // 详情类型 → 用预创建的语音对象播报
+      // 详情类型 → 用预创建的语音对象播报（不cancel！保持手势上下文）
       if (data.type === 'detail') {
+        speakAndShow(data.answer, pendingUtter);
+        pendingUtter = null;
+      } else {
+        // 非 detail 类型（not_found 等），清理预热语音
         if (pendingUtter) {
-          pendingUtter.text = data.answer;
           window.speechSynthesis.cancel();
-          window.speechSynthesis.speak(pendingUtter);
           pendingUtter = null;
         }
-        speakAndShow(data.answer);
       }
 
     } else {
       addChatMsg('抱歉，未找到相关信息。', 'bot');
+      if (pendingUtter) { window.speechSynthesis.cancel(); pendingUtter = null; }
     }
   } catch (err) {
     loading.remove();
     addChatMsg('网络连接失败，请稍后重试。', 'bot');
+    if (pendingUtter) { window.speechSynthesis.cancel(); pendingUtter = null; }
   }
 }
 
