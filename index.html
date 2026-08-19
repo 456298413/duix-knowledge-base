@@ -168,8 +168,14 @@
             // 直接传入 appId 和 appKey，让 SDK 自动向 DUIX 官方获取签名
            var conversationId = '2089675482202521601';
             
-            try {
-                await duix.init({
+           // 超时保护
+var initTimer = setTimeout(function() {
+    document.getElementById('duixStatus').className = 'status disconnected';
+    document.getElementById('duixStatus').textContent = '初始化超时';
+}, 15000);
+
+try {
+    await duix.init({
                     appId: document.getElementById('appId').value,
                     appKey: document.getElementById('appKey').value,
                     containerLable: '#duix-container',
