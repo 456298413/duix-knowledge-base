@@ -190,29 +190,33 @@
                 console.log('数字人说话结束:', data.content);
             });
 
-            // 获取 sign 并初始化
-            const sign = await fetchSign();
-            if (!sign) {
-                document.getElementById('duixStatus').className = 'status disconnected';
-                document.getElementById('duixStatus').textContent = '鉴权失败';
-                checkKB();
-                return;
-            }
+           // 获取 sign 并初始化
+const sign = await fetchSign();
+if (!sign) {
+    document.getElementById('duixStatus').className = 'status disconnected';
+    document.getElementById('duixStatus').textContent = '鉴权失败';
+    checkKB();
+    return;
+}
 
-                       try {
-                const res = await duix.init({
-                    sign: sign,
-                    containerLable: '#duix-container',
-                    platform: 'duix.guiji.cn'
-                });
-                console.log('DUIX init 调用成功:', res);
-            } catch (err) {
-                console.error('DUIX init 失败:', err);
-                document.getElementById('duixStatus').className = 'status disconnected';
-                document.getElementById('duixStatus').textContent = '初始化失败';
-            }
+// 生成唯一的 conversationId
+var conversationId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
-            checkKB();
+try {
+    await duix.init({
+        sign: sign,
+        containerLable: '#duix-container',
+        platform: 'duix.guiji.cn',
+        conversationId: conversationId
+    });
+    console.log('DUIX init 调用成功, conversationId:', conversationId);
+} catch (err) {
+    console.error('DUIX init 失败:', err);
+    document.getElementById('duixStatus').className = 'status disconnected';
+    document.getElementById('duixStatus').textContent = '初始化失败';
+}
+
+checkKB();
         }
 
         // 问答功能
