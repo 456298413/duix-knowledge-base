@@ -79,7 +79,9 @@
     font-size: 0.88rem;
     line-height: 1.75;
     color: #333;
-    max-width: 42%;
+    max-width: 15%;
+    max-height: 50vh;
+    word-break: break-all;
     opacity: 0;
     transform: scale(0.85);
     transition: opacity 0.35s ease, transform 0.35s ease;
@@ -94,18 +96,22 @@
     transform: scale(1);
   }
 
-  /* 左侧气泡：从header-bar底部开始 */
+  /* 左侧气泡：红框范围内 */
   .bubble-left {
-    left: 2.5%;
-    top: 100px;
-    bottom: 16px;
+    left: 4%;
+    top: 12%;
+    width: 18%;
+    max-width: 18%;
+    bottom: 30%;
   }
 
-  /* 右侧气泡 */
+  /* 右侧气泡：红框范围内 */
   .bubble-right {
-    right: 2.5%;
-    top: 100px;
-    bottom: 16px;
+    left: 78%;
+    top: 12%;
+    width: 18%;
+    max-width: 18%;
+    bottom: 30%;
   }
 
   .bubble::-webkit-scrollbar { width: 3px; }
@@ -342,9 +348,9 @@
     .container { flex-direction: column; }
     .left-panel { flex: 0 0 45vh; }
     .right-panel { flex: 1; }
-    .bubble { max-width: 46%; font-size: 0.8rem; padding: 10px 14px; }
-    .bubble-left { left: 2%; top: 80px; }
-    .bubble-right { right: 2%; top: 80px; }
+    .bubble { max-width: 22%; font-size: 0.8rem; padding: 10px 14px; }
+    .bubble-left { left: 2%; top: 10%; width: 20%; bottom: 35%; }
+    .bubble-right { left: 76%; top: 10%; width: 20%; bottom: 35%; }
   }
 </style>
 </head>
