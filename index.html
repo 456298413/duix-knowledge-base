@@ -68,36 +68,6 @@
     object-position: center 45%;
   }
 
-  /* ===== 嘴巴说话动画 ===== */
-  .mouth-overlay {
-    position: absolute;
-    /* 嘴巴位置：根据原图1600×883，嘴巴中心在约50%水平、53%垂直 */
-    /* object-position: center 45%，嘴巴在可见区域的 (53-45)/(100-45) ≈ 17% 垂直 */
-    left: 50%;
-    top: 17.3%;
-    width: 4.2%;
-    height: 1.8%;
-    transform: translate(-50%, -50%) scaleY(0.15);
-    transform-origin: center center;
-    background: radial-gradient(ellipse at 50% 30%, #3a1212 0%, #6b2828 40%, #f5c8b8 75%, transparent 100%);
-    border-radius: 50%;
-    z-index: 16;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s;
-    filter: blur(0.3px);
-  }
-  .mouth-overlay.speaking {
-    opacity: 1;
-    animation: mouthMove 0.13s ease-in-out infinite alternate;
-  }
-  @keyframes mouthMove {
-    0%   { transform: translate(-50%, -50%) scaleY(0.15); }
-    30%  { transform: translate(-50%, -50%) scaleY(1.2); }
-    60%  { transform: translate(-50%, -50%) scaleY(0.6); }
-    100% { transform: translate(-50%, -50%) scaleY(1.5); }
-  }
-
   /* ===== 对话气泡 ===== */
   .bubble {
     position: absolute;
@@ -459,7 +429,6 @@
       <div class="subtitle">维权帮扶 · 关爱职工 · 凝心聚力</div>
     </div>
     <img class="character-img" src="character.png" alt="安安">
-    <div class="mouth-overlay" id="mouthOverlay"></div>
 
     <div class="bubble bubble-left" id="bubbleLeft"></div>
     <div class="bubble bubble-right" id="bubbleRight"></div>
@@ -508,7 +477,6 @@ const btnVoice = document.getElementById('btnVoice');
 const particleContainer = document.getElementById('particleContainer');
 const roundDots = document.getElementById('roundDots');
 const quickBar = document.getElementById('quickBar');
-const mouthOverlay = document.getElementById('mouthOverlay');
 
 let isSpeaking = false;
 let particleTimer = null;
@@ -555,14 +523,6 @@ function stopParticles() {
   particleTimer = null;
 }
 
-function startMouth() {
-  if (mouthOverlay) mouthOverlay.classList.add('speaking');
-}
-
-function stopMouth() {
-  if (mouthOverlay) mouthOverlay.classList.remove('speaking');
-}
-
 function createParticle() {
   const p = document.createElement('div');
   p.className = 'particle';
@@ -591,7 +551,6 @@ function hideBubbles() {
   roundDots.innerHTML = '';
   charTimers.forEach(t => clearTimeout(t));
   charTimers = [];
-  stopMouth();
   if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
 }
 
@@ -749,13 +708,12 @@ function speakAndShow(text) {
     utter.pitch = 1.1;
     if (voice) utter.voice = voice;
 
-    // 语音开始后启动自动滚动和嘴巴动画
-    utter.onstart = () => { startAutoScroll(); startMouth(); };
+    // 语音开始后启动自动滚动
+    utter.onstart = () => { startAutoScroll(); };
 
     utter.onend = () => {
       isSpeaking = false;
       stopParticles();
-      stopMouth();
       // 最后一个字也标记
       if (charSpans.length > 0) {
         charSpans[charSpans.length-1].classList.remove('active-char');
@@ -773,7 +731,6 @@ function speakAndShow(text) {
     utter.onerror = () => {
       isSpeaking = false;
       stopParticles();
-      stopMouth();
       cursor.remove();
       if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
       hideBubbles();
