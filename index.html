@@ -199,13 +199,13 @@
                 return;
             }
 
-            try {
-                await duix.init({
+                       try {
+                const res = await duix.init({
                     sign: sign,
                     containerLable: '#duix-container',
-                    platform: 'duix.com'
+                    platform: 'duix.guiji.cn'
                 });
-                console.log('DUIX init 调用成功');
+                console.log('DUIX init 调用成功:', res);
             } catch (err) {
                 console.error('DUIX init 失败:', err);
                 document.getElementById('duixStatus').className = 'status disconnected';
