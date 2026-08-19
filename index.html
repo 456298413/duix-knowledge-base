@@ -28,6 +28,7 @@
     overflow: hidden;
   }
 
+  /* ===== 左侧：人物区域 ===== */
   .left-panel {
     flex: 0 0 60%;
     position: relative;
@@ -67,6 +68,7 @@
     object-position: center 45%;
   }
 
+  /* ===== 对话气泡 ===== */
   .bubble {
     position: absolute;
     z-index: 20;
@@ -89,26 +91,57 @@
     pointer-events: auto;
   }
 
-  .bubble.visible { opacity: 1; transform: scale(1); }
+  .bubble.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
 
-  .bubble-left { left: 1.5%; top: 14%; width: 14%; max-width: 14%; bottom: 45%; }
-  .bubble-right { right: 1.5%; top: 14%; width: 14%; max-width: 14%; bottom: 45%; }
+  .bubble-left {
+    left: 1.5%;
+    top: 14%;
+    width: 28%;
+    max-width: 28%;
+    bottom: 45%;
+  }
+
+  .bubble-right {
+    right: 1.5%;
+    top: 14%;
+    width: 28%;
+    max-width: 28%;
+    bottom: 45%;
+  }
 
   .bubble::-webkit-scrollbar { width: 3px; }
   .bubble::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
 
-  .bubble .sentence {
-    transition: color 0.2s, background 0.2s;
-    border-radius: 3px;
-    padding: 0 1px;
+  /* 打字机效果 */
+  .bubble .tw-char {
+    display: inline;
+    opacity: 0;
+    transition: opacity 0.08s;
   }
-  .bubble .sentence.spoken { color: #999; }
-  .bubble .sentence.active {
+  .bubble .tw-char.visible {
+    opacity: 1;
+  }
+  .bubble .tw-char.active-char {
     color: #d4380d;
-    font-weight: 500;
-    background: rgba(212,56,13,0.08);
+    font-weight: 600;
+  }
+  .bubble .tw-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1.1em;
+    background: #d4380d;
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: blink 0.6s step-end infinite;
+  }
+  @keyframes blink {
+    50% { opacity: 0; }
   }
 
+  /* ===== 粒子特效 ===== */
   .particle-container {
     position: absolute;
     z-index: 15;
@@ -129,6 +162,7 @@
     100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0); }
   }
 
+  /* ===== 轮次指示器 ===== */
   .round-dots {
     position: absolute;
     bottom: 10px;
@@ -152,6 +186,7 @@
 
   .round-dot.active { background: #d4380d; }
 
+  /* ===== 右侧：聊天区域 ===== */
   .right-panel {
     flex: 0 0 40%;
     display: flex;
@@ -221,6 +256,7 @@
     margin-top: 8px;
   }
 
+  /* 聊天区内的菜单按钮 */
   .chat-menu-options {
     display: flex;
     flex-direction: column;
@@ -247,6 +283,7 @@
     transform: translateX(4px);
   }
 
+  /* ===== 快捷按钮栏 ===== */
   .quick-bar {
     padding: 10px 16px 2px;
     display: flex;
@@ -268,7 +305,10 @@
     white-space: nowrap;
   }
 
-  .quick-btn:hover { background: #d4380d; color: #fff; }
+  .quick-btn:hover {
+    background: #d4380d;
+    color: #fff;
+  }
 
   .chat-input-area {
     padding: 10px 20px 16px;
@@ -326,13 +366,14 @@
     50% { box-shadow: 0 0 0 10px rgba(212,56,13,0); }
   }
 
+  /* ===== 响应式 ===== */
   @media (max-width: 768px) {
     .container { flex-direction: column; }
     .left-panel { flex: 0 0 45vh; }
     .right-panel { flex: 1; }
-    .bubble { max-width: 16%; font-size: 0.8rem; padding: 10px 14px; }
-    .bubble-left { left: 1%; top: 12%; width: 16%; bottom: 48%; }
-    .bubble-right { right: 1%; top: 12%; width: 16%; bottom: 48%; }
+    .bubble { max-width: 32%; font-size: 0.8rem; padding: 10px 14px; }
+    .bubble-left { left: 1%; top: 12%; width: 32%; bottom: 48%; }
+    .bubble-right { right: 1%; top: 12%; width: 32%; bottom: 48%; }
     .quick-bar { padding: 8px 12px 2px; }
     .quick-btn { font-size: 0.78rem; padding: 6px 12px; }
   }
@@ -341,6 +382,7 @@
 <body>
 
 <div class="container">
+  <!-- 左侧：人物 + 气泡 -->
   <div class="left-panel">
     <div class="header-bar">
       <h1>安安 · 工会智能助手</h1>
@@ -354,6 +396,7 @@
     <div class="round-dots" id="roundDots"></div>
   </div>
 
+  <!-- 右侧：聊天 -->
   <div class="right-panel">
     <div class="chat-header">
       <h2>💬 与轶安安对话</h2>
@@ -398,8 +441,10 @@ const quickBar = document.getElementById('quickBar');
 let isSpeaking = false;
 let particleTimer = null;
 let recognition = null;
-let sentenceTimers = [];
+let charTimers = [];
+let scrollAnimId = null;
 
+// ===== 快捷按钮 =====
 quickBar.addEventListener('click', (e) => {
   const btn = e.target.closest('.quick-btn');
   if (!btn) return;
@@ -407,6 +452,7 @@ quickBar.addEventListener('click', (e) => {
   sendMsg();
 });
 
+// ===== 语音识别 =====
 function initRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { btnVoice.style.display = 'none'; return; }
@@ -424,6 +470,7 @@ btnVoice.addEventListener('click', () => {
   btnVoice.classList.contains('recording') ? recognition.stop() : recognition.start();
 });
 
+// ===== 粒子特效 =====
 function startParticles() {
   if (particleTimer) return;
   particleTimer = setInterval(() => {
@@ -452,53 +499,35 @@ function createParticle() {
   setTimeout(() => p.remove(), 2000);
 }
 
+// ===== 隐藏气泡 =====
 function hideBubbles() {
   bubbleLeft.classList.remove('visible');
   bubbleRight.classList.remove('visible');
   bubbleLeft.innerHTML = '';
   bubbleRight.innerHTML = '';
+  bubbleLeft.className = 'bubble bubble-left';
+  bubbleRight.className = 'bubble bubble-right';
   roundDots.classList.remove('visible');
   roundDots.innerHTML = '';
-  sentenceTimers.forEach(t => clearTimeout(t));
-  sentenceTimers = [];
+  charTimers.forEach(t => clearTimeout(t));
+  charTimers = [];
+  if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
 }
 
-function splitIntoSentences(text) {
-  const result = [];
-  let current = '';
-  for (const char of text) {
-    current += char;
-    if ('。！？；\n'.includes(char) && current.trim()) {
-      result.push(current.trim());
-      current = '';
-    }
-  }
-  if (current.trim()) result.push(current.trim());
-  return result;
-}
-
-function showTextInBubble(bubble, text) {
-  const sentences = splitIntoSentences(text);
-  bubble.innerHTML = '';
-  sentences.forEach((sentence, i) => {
-    const span = document.createElement('span');
-    span.className = 'sentence';
-    span.dataset.index = i;
-    span.textContent = sentence;
-    bubble.appendChild(span);
-  });
-}
-
+// ===== 语音播报 + 打字机逐字出现 =====
 function speakAndShow(text) {
   window.speechSynthesis.cancel();
   hideBubbles();
   stopParticles();
-  sentenceTimers.forEach(t => clearTimeout(t));
-  sentenceTimers = [];
+  charTimers.forEach(t => clearTimeout(t));
+  charTimers = [];
+  if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
 
   if (!text || !window.speechSynthesis) return;
 
   const MAX_PER_SIDE = 180;
+
+  // 按段落切分轮次
   const paragraphs = text.split('\n').filter(p => p.trim());
   const rounds = [];
   let buf = '';
@@ -515,6 +544,7 @@ function speakAndShow(text) {
 
   let roundIdx = 0;
 
+  // 轮次指示器
   if (rounds.length > 1) {
     roundDots.innerHTML = '';
     for (let i = 0; i < rounds.length; i++) {
@@ -525,6 +555,7 @@ function speakAndShow(text) {
     roundDots.classList.add('visible');
   }
 
+  // 获取语音
   function getVoice() {
     const voices = window.speechSynthesis.getVoices();
     const prefs = ['Microsoft Xiaoxiao','Xiaoxiao','Huihui','Microsoft Huihui','Google 普通话','Ting-Ting'];
@@ -540,7 +571,8 @@ function speakAndShow(text) {
 
   const voice = getVoice();
   const SPEECH_RATE = 0.92;
-  const CHARS_PER_SEC = 4.5 * SPEECH_RATE;
+  // 打字机速度：跟随语音节奏
+  const MS_PER_CHAR = 1000 / (4.5 * SPEECH_RATE);
 
   function playRound() {
     if (roundIdx >= rounds.length) {
@@ -553,48 +585,97 @@ function speakAndShow(text) {
     hideBubbles();
 
     const bubble = side === 'left' ? bubbleLeft : bubbleRight;
-    showTextInBubble(bubble, rText);
+
+    // 创建容器，每个字符一个span
+    const innerDiv = document.createElement('div');
+    innerDiv.style.cssText = 'position:relative;';
+    bubble.appendChild(innerDiv);
     bubble.classList.add('visible');
 
+    // 逐字创建 span
+    const charSpans = [];
+    for (let i = 0; i < rText.length; i++) {
+      const cs = document.createElement('span');
+      cs.className = 'tw-char';
+      cs.textContent = rText[i];
+      innerDiv.appendChild(cs);
+      charSpans.push(cs);
+    }
+    // 光标
+    const cursor = document.createElement('span');
+    cursor.className = 'tw-cursor';
+    innerDiv.appendChild(cursor);
+
+    // 更新轮次指示器
     const dots = roundDots.querySelectorAll('.round-dot');
     dots.forEach((d, i) => d.classList.toggle('active', i === roundIdx));
 
-    const sentences = bubble.querySelectorAll('.sentence');
+    isSpeaking = true;
+    startParticles();
+
+    // 检查是否需要滚动
+    const totalHeight = innerDiv.scrollHeight;
+    const visibleHeight = bubble.clientHeight;
+    const needsScroll = totalHeight > visibleHeight;
+
+    // 滚动函数：从顶部慢慢滚到底部
+    function startAutoScroll() {
+      if (!needsScroll) return;
+      bubble.scrollTop = 0;
+      const scrollDuration = charSpans.length * MS_PER_CHAR;
+      const startTime = performance.now();
+      function step(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / scrollDuration, 1);
+        const maxScroll = innerDiv.scrollHeight - bubble.clientHeight;
+        bubble.scrollTop = progress * maxScroll;
+        if (progress < 1) {
+          scrollAnimId = requestAnimationFrame(step);
+        }
+      }
+      scrollAnimId = requestAnimationFrame(step);
+    }
+
+    // 逐字显示定时器
     let elapsed = 0;
-    sentences.forEach((span, i) => {
-      const charCount = span.textContent.length;
-      const duration = (charCount / CHARS_PER_SEC) * 1000;
-
-      const startTimer = setTimeout(() => {
-        sentences.forEach((s, j) => {
-          if (j < i) s.className = 'sentence spoken';
-          else if (j === i) s.className = 'sentence active';
-          else s.className = 'sentence';
-        });
-        const bubbleRect = bubble.getBoundingClientRect();
-        const spanRect = span.getBoundingClientRect();
-        const relativeTop = spanRect.top - bubbleRect.top;
-        const visibleHeight = bubble.clientHeight;
-        const scrollTarget = bubble.scrollTop + relativeTop - visibleHeight * 0.3;
-        bubble.scrollTo({ top: Math.max(0, scrollTarget), behavior: 'smooth' });
+    for (let i = 0; i < charSpans.length; i++) {
+      const t = setTimeout(() => {
+        charSpans[i].classList.add('visible');
+        if (i > 0) charSpans[i-1].classList.remove('active-char');
+        charSpans[i].classList.add('active-char');
+        // 光标跟随
+        cursor.remove();
+        innerDiv.appendChild(cursor);
+        // 没有自动滚动时手动跟随
+        if (!needsScroll) {
+          const cr = cursor.getBoundingClientRect();
+          const br = bubble.getBoundingClientRect();
+          if (cr.bottom > br.bottom - 10) {
+            bubble.scrollTop += cr.bottom - br.bottom + 20;
+          }
+        }
       }, elapsed);
-      sentenceTimers.push(startTimer);
+      charTimers.push(t);
+      elapsed += MS_PER_CHAR;
+    }
 
-      elapsed += duration;
-    });
-
+    // TTS 播报
     const utter = new SpeechSynthesisUtterance(rText);
     utter.lang = 'zh-CN';
     utter.rate = SPEECH_RATE;
     utter.pitch = 1.1;
     if (voice) utter.voice = voice;
 
-    isSpeaking = true;
-    startParticles();
+    utter.onstart = () => { startAutoScroll(); };
 
     utter.onend = () => {
       isSpeaking = false;
       stopParticles();
+      if (charSpans.length > 0) {
+        charSpans[charSpans.length-1].classList.remove('active-char');
+      }
+      cursor.remove();
+      if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
       roundIdx++;
       if (roundIdx < rounds.length) {
         setTimeout(playRound, 600);
@@ -603,13 +684,21 @@ function speakAndShow(text) {
       }
     };
 
-    utter.onerror = () => { isSpeaking = false; stopParticles(); hideBubbles(); };
+    utter.onerror = () => {
+      isSpeaking = false;
+      stopParticles();
+      cursor.remove();
+      if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
+      hideBubbles();
+    };
+
     window.speechSynthesis.speak(utter);
   }
 
   playRound();
 }
 
+// ===== 发送消息 =====
 async function sendMsg() {
   const text = userInput.value.trim();
   if (!text) return;
@@ -676,6 +765,7 @@ function addChatMsg(text, type) {
   return div;
 }
 
+// ===== 事件绑定 =====
 btnSend.addEventListener('click', sendMsg);
 userInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
 window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
