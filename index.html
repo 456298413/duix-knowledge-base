@@ -92,14 +92,10 @@
     <script>
         let duix = null;
         let duixReady = false;
-        let kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
-
-        document.getElementById('appId').value = '1539357019641876480';
-        document.getElementById('appKey').value = '7bf9f999-d214-441d-91dd-3833d0bb24be';
 
         async function checkKB() {
             try {
-                kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+                var kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
                 const resp = await fetch(kbApiUrl + '/api/health');
                 const data = await resp.json();
                 document.getElementById('kbStatus').className = 'status connected';
@@ -107,6 +103,18 @@
             } catch (e) {
                 document.getElementById('kbStatus').className = 'status disconnected';
                 document.getElementById('kbStatus').textContent = '未连接';
+            }
+        }
+
+        async function fetchSign() {
+            var kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+            const resp = await fetch(kbApiUrl + '/api/sign');
+            const data = await resp.json();
+            if (data.success) {
+                console.log('获取 sign 成功, expires_in:', data.expires_in);
+                return data.sign;
+            } else {
+                throw new Error('获取 sign 失败: ' + data.error);
             }
         }
 
@@ -122,13 +130,11 @@
 
             duix = new DUIX();
 
-            // ★★★ 关键修复：在 init 之前就注册事件监听 ★★★
             duix.on('show', function() {
                 console.log('DUIX 数字人已显示');
                 duixReady = true;
                 document.getElementById('duixStatus').className = 'status connected';
                 document.getElementById('duixStatus').textContent = '已连接';
-                // 播报欢迎语
                 duix.speak({
                     content: '您好！我是工会知识库助手，可以回答关于工会福利、关爱服务、帮扶救助、财务管理等问题。请问有什么可以帮您？',
                     interrupt: true
@@ -136,7 +142,7 @@
             });
 
             duix.on('error', function(err) {
-                console.error('DUIX error event:', err);
+                console.error('DUIX error event:', JSON.stringify(err));
             });
 
             var conversationId = '2089675482202521601';
@@ -148,12 +154,14 @@
             }, 20000);
 
             try {
+                document.getElementById('duixStatus').textContent = '获取签名...';
+                var sign = await fetchSign();
+
                 await duix.init({
-                    appId: document.getElementById('appId').value,
-                    appKey: document.getElementById('appKey').value,
+                    sign: sign,
                     containerLable: '#duix-container',
-                    platform: 'duix.com',
-                    conversationId: conversationId
+                    conversationId: conversationId,
+                    platform: 'duix.com'
                 });
                 clearTimeout(initTimer);
                 console.log('DUIX init 成功');
@@ -161,28 +169,38 @@
                 document.getElementById('duixStatus').className = 'status loading';
                 document.getElementById('duixStatus').textContent = '启动中...';
 
-                // ★★★ 关键修复：muted 改为 false，打开声音 ★★★
-                var startRes = await duix.start({
-                    muted: false,
-                    openAsr: false
-                });
-                console.log('DUIX start 结果:', JSON.stringify(startRes));
-
-                if (startRes && startRes.err) {
-                    console.error('start 失败:', startRes.err);
-                    document.getElementById('duixStatus').className = 'status disconnected';
-                    document.getElementById('duixStatus').textContent = '启动失败: ' + startRes.err;
-                } else {
-                    console.log('DUIX start 成功，等待数字人显示...');
-                    setTimeout(function() {
-                        if (!duixReady) {
-                            duixReady = true;
-                            document.getElementById('duixStatus').className = 'status connected';
-                            document.getElementById('duixStatus').textContent = '已连接';
-                            console.log('DUIX 标记为已连接（超时兜底）');
+                var startDone = false;
+                function tryStart() {
+                    if (startDone) return;
+                    startDone = true;
+                    duix.start({
+                        muted: false,
+                        openAsr: false
+                    }).then(function(res) {
+                        console.log('DUIX start 结果:', JSON.stringify(res));
+                        if (res && res.err) {
+                            document.getElementById('duixStatus').className = 'status disconnected';
+                            document.getElementById('duixStatus').textContent = '启动失败: ' + res.err;
+                        } else {
+                            console.log('DUIX start 成功');
                         }
-                    }, 5000);
+                    }).catch(function(err) {
+                        console.error('start 异常:', err);
+                    });
                 }
+
+                duix.on('initialSuccess', function() {
+                    console.log('收到 initialSuccess，调用 start');
+                    tryStart();
+                });
+
+                setTimeout(function() {
+                    if (!startDone) {
+                        console.warn('initialSuccess 未触发，直接调用 start');
+                        tryStart();
+                    }
+                }, 5000);
+
             } catch (err) {
                 clearTimeout(initTimer);
                 console.error('DUIX 错误:', err);
@@ -194,7 +212,7 @@
         }
 
         async function queryKB(question) {
-            kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+            var kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
             const resp = await fetch(kbApiUrl + '/api/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -223,16 +241,12 @@
                         sourceText = '📄 来源：' + result.source + ' | ' + result.chapter;
                     }
                     addChatMsg(answerText, 'bot', sourceText);
-                    // 让数字人播报回答
                     if (duix && duixReady) {
                         var speakText = answerText;
                         if (speakText.length > 500) {
                             speakText = speakText.substring(0, 500) + '...';
                         }
-                        console.log('DUIX speak:', speakText.substring(0, 50));
                         duix.speak({ content: speakText, interrupt: true });
-                    } else {
-                        console.warn('DUIX 未就绪，跳过播报。duixReady=' + duixReady);
                     }
                 } else {
                     addChatMsg(result.error || '查询失败', 'bot');
