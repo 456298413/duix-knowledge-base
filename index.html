@@ -68,6 +68,36 @@
     object-position: center 45%;
   }
 
+  /* ===== 嘴巴说话动画 ===== */
+  .mouth-overlay {
+    position: absolute;
+    /* 嘴巴位置：根据原图1600×883，嘴巴中心在约50%水平、53%垂直 */
+    /* object-position: center 45%，嘴巴在可见区域的 (53-45)/(100-45) ≈ 17% 垂直 */
+    left: 50%;
+    top: 17.3%;
+    width: 4.2%;
+    height: 1.8%;
+    transform: translate(-50%, -50%) scaleY(0.15);
+    transform-origin: center center;
+    background: radial-gradient(ellipse at 50% 30%, #3a1212 0%, #6b2828 40%, #f5c8b8 75%, transparent 100%);
+    border-radius: 50%;
+    z-index: 16;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    filter: blur(0.3px);
+  }
+  .mouth-overlay.speaking {
+    opacity: 1;
+    animation: mouthMove 0.13s ease-in-out infinite alternate;
+  }
+  @keyframes mouthMove {
+    0%   { transform: translate(-50%, -50%) scaleY(0.15); }
+    30%  { transform: translate(-50%, -50%) scaleY(1.2); }
+    60%  { transform: translate(-50%, -50%) scaleY(0.6); }
+    100% { transform: translate(-50%, -50%) scaleY(1.5); }
+  }
+
   /* ===== 对话气泡 ===== */
   .bubble {
     position: absolute;
@@ -139,6 +169,19 @@
   }
   @keyframes blink {
     50% { opacity: 0; }
+  }
+
+  /* 气泡溢出滚动动画 */
+  .bubble.scrolling-text {
+    animation: bubbleScroll linear infinite;
+    animation-play-state: paused;
+  }
+  .bubble.scrolling-text.do-scroll {
+    animation-play-state: running;
+  }
+  @keyframes bubbleScroll {
+    0%   { transform: translateY(0); }
+    100% { transform: translateY(-100%); }
   }
 
   /* ===== 粒子特效 ===== */
@@ -368,14 +411,41 @@
 
   /* ===== 响应式 ===== */
   @media (max-width: 768px) {
-    .container { flex-direction: column; }
-    .left-panel { flex: 0 0 45vh; }
-    .right-panel { flex: 1; }
-    .bubble { max-width: 32%; font-size: 0.8rem; padding: 10px 14px; }
-    .bubble-left { left: 1%; top: 12%; width: 32%; bottom: 48%; }
-    .bubble-right { right: 1%; top: 12%; width: 32%; bottom: 48%; }
-    .quick-bar { padding: 8px 12px 2px; }
-    .quick-btn { font-size: 0.78rem; padding: 6px 12px; }
+    body { overflow: auto; }
+    .container {
+      flex-direction: column;
+      height: 100dvh;
+    }
+    .left-panel {
+      flex: 0 0 35vh;
+      min-height: 200px;
+    }
+    .header-bar { padding: 10px 12px 6px; }
+    .header-bar h1 { font-size: 1.3rem; letter-spacing: 3px; }
+    .header-bar .subtitle { font-size: 0.72rem; letter-spacing: 1px; }
+    .right-panel {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .chat-header { padding: 10px 14px 8px; }
+    .chat-header h2 { font-size: 0.95rem; }
+    .chat-header p { font-size: 0.7rem; }
+    .chat-messages { padding: 10px 14px; gap: 10px; }
+    .message { font-size: 0.85rem; padding: 10px 14px; }
+    .bubble { max-width: 40%; font-size: 0.75rem; padding: 8px 12px; }
+    .bubble-left { left: 2%; top: 10%; width: 40%; bottom: 50%; }
+    .bubble-right { right: 2%; top: 10%; width: 40%; bottom: 50%; }
+    .quick-bar { padding: 6px 10px 2px; gap: 6px; }
+    .quick-btn { font-size: 0.72rem; padding: 5px 10px; }
+    .chat-input-area { padding: 8px 12px 12px; }
+    .chat-input-area input { padding: 10px 14px; font-size: 0.85rem; }
+    .btn-send, .btn-voice { width: 38px; height: 38px; font-size: 1rem; }
+  }
+  /* 超小屏 */
+  @media (max-width: 380px) {
+    .left-panel { flex: 0 0 28vh; min-height: 160px; }
+    .header-bar h1 { font-size: 1.1rem; letter-spacing: 2px; }
   }
 </style>
 </head>
@@ -389,6 +459,7 @@
       <div class="subtitle">维权帮扶 · 关爱职工 · 凝心聚力</div>
     </div>
     <img class="character-img" src="character.png" alt="安安">
+    <div class="mouth-overlay" id="mouthOverlay"></div>
 
     <div class="bubble bubble-left" id="bubbleLeft"></div>
     <div class="bubble bubble-right" id="bubbleRight"></div>
@@ -437,6 +508,7 @@ const btnVoice = document.getElementById('btnVoice');
 const particleContainer = document.getElementById('particleContainer');
 const roundDots = document.getElementById('roundDots');
 const quickBar = document.getElementById('quickBar');
+const mouthOverlay = document.getElementById('mouthOverlay');
 
 let isSpeaking = false;
 let particleTimer = null;
@@ -483,6 +555,14 @@ function stopParticles() {
   particleTimer = null;
 }
 
+function startMouth() {
+  if (mouthOverlay) mouthOverlay.classList.add('speaking');
+}
+
+function stopMouth() {
+  if (mouthOverlay) mouthOverlay.classList.remove('speaking');
+}
+
 function createParticle() {
   const p = document.createElement('div');
   p.className = 'particle';
@@ -511,6 +591,7 @@ function hideBubbles() {
   roundDots.innerHTML = '';
   charTimers.forEach(t => clearTimeout(t));
   charTimers = [];
+  stopMouth();
   if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
 }
 
@@ -618,20 +699,21 @@ function speakAndShow(text) {
     const visibleHeight = bubble.clientHeight;
     const needsScroll = totalHeight > visibleHeight;
 
-    // 滚动函数：从顶部慢慢滚到底部
+    let currentChar = 0;
+    let scrollProgress = 0; // 0~1
+
+    // 滚动函数：从顶部慢慢滚到底部，循环
     function startAutoScroll() {
       if (!needsScroll) return;
       bubble.scrollTop = 0;
-      const scrollDuration = charSpans.length * MS_PER_CHAR;
+      const scrollDuration = charSpans.length * MS_PER_CHAR; // 与打字同步
       const startTime = performance.now();
       function step(now) {
         const elapsed = now - startTime;
-        const progress = Math.min(elapsed / scrollDuration, 1);
+        const progress = (elapsed % scrollDuration) / scrollDuration;
         const maxScroll = innerDiv.scrollHeight - bubble.clientHeight;
         bubble.scrollTop = progress * maxScroll;
-        if (progress < 1) {
-          scrollAnimId = requestAnimationFrame(step);
-        }
+        scrollAnimId = requestAnimationFrame(step);
       }
       scrollAnimId = requestAnimationFrame(step);
     }
@@ -641,12 +723,13 @@ function speakAndShow(text) {
     for (let i = 0; i < charSpans.length; i++) {
       const t = setTimeout(() => {
         charSpans[i].classList.add('visible');
+        // 高亮当前字
         if (i > 0) charSpans[i-1].classList.remove('active-char');
         charSpans[i].classList.add('active-char');
         // 光标跟随
         cursor.remove();
         innerDiv.appendChild(cursor);
-        // 没有自动滚动时手动跟随
+        // 如果没有自动滚动，手动跟随滚动
         if (!needsScroll) {
           const cr = cursor.getBoundingClientRect();
           const br = bubble.getBoundingClientRect();
@@ -666,11 +749,14 @@ function speakAndShow(text) {
     utter.pitch = 1.1;
     if (voice) utter.voice = voice;
 
-    utter.onstart = () => { startAutoScroll(); };
+    // 语音开始后启动自动滚动和嘴巴动画
+    utter.onstart = () => { startAutoScroll(); startMouth(); };
 
     utter.onend = () => {
       isSpeaking = false;
       stopParticles();
+      stopMouth();
+      // 最后一个字也标记
       if (charSpans.length > 0) {
         charSpans[charSpans.length-1].classList.remove('active-char');
       }
@@ -687,6 +773,7 @@ function speakAndShow(text) {
     utter.onerror = () => {
       isSpeaking = false;
       stopParticles();
+      stopMouth();
       cursor.remove();
       if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
       hideBubbles();
@@ -715,6 +802,7 @@ async function sendMsg() {
     if (data.success && data.answer) {
       const botDiv = addChatMsg(data.answer, 'bot');
 
+      // 来源标签
       if (data.source) {
         const tag = document.createElement('span');
         tag.className = 'source-tag';
@@ -722,6 +810,7 @@ async function sendMsg() {
         botDiv.appendChild(tag);
       }
 
+      // 菜单类型 / 澄清类型 → 显示可点击按钮
       if ((data.type === 'menu' || data.type === 'clarify') && data.menu_items && data.menu_items.length) {
         const menuDiv = document.createElement('div');
         menuDiv.className = 'chat-menu-options';
@@ -737,12 +826,14 @@ async function sendMsg() {
         }
         botDiv.appendChild(menuDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
+        // 菜单类型：气泡只显示简短提示，不播报
         bubbleLeft.textContent = data.answer.split('\n')[0];
         bubbleRight.textContent = '';
         bubbleLeft.classList.add('visible');
         return;
       }
 
+      // 详情类型 → 语音播报 + 气泡滚动高亮
       if (data.type === 'detail') {
         speakAndShow(data.answer);
       }
