@@ -11,7 +11,8 @@ CORS(app)
 
 KB_PATH = os.path.join(os.path.dirname(__file__), 'knowledge_base', 'knowledge_base.json')
 with open(KB_PATH, 'r', encoding='utf-8') as f:
-    knowledge_base = json.load(f)
+    kb_data = json.load(f)
+knowledge_base = kb_data['entries']  # 关键：提取 entries 列表
 
 VOICES = {
     'xiaoxiao': 'zh-CN-XiaoxiaoNeural',
