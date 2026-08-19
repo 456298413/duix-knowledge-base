@@ -6,7 +6,6 @@
 <title>轶安安 · 工会智能助手</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
 
   body {
@@ -28,7 +27,6 @@
     overflow: hidden;
   }
 
-  /* ===== 左侧：人物区域 ===== */
   .left-panel {
     flex: 0 0 60%;
     position: relative;
@@ -68,7 +66,6 @@
     object-position: center 45%;
   }
 
-  /* ===== 对话气泡 ===== */
   .bubble {
     position: absolute;
     z-index: 20;
@@ -115,7 +112,6 @@
   .bubble::-webkit-scrollbar { width: 3px; }
   .bubble::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
 
-  /* 打字机效果 */
   .bubble .tw-char {
     display: inline;
     opacity: 0;
@@ -141,7 +137,6 @@
     50% { opacity: 0; }
   }
 
-  /* 气泡溢出滚动动画 */
   .bubble.scrolling-text {
     animation: bubbleScroll linear infinite;
     animation-play-state: paused;
@@ -154,7 +149,6 @@
     100% { transform: translateY(-100%); }
   }
 
-  /* ===== 粒子特效 ===== */
   .particle-container {
     position: absolute;
     z-index: 15;
@@ -175,7 +169,6 @@
     100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0); }
   }
 
-  /* ===== 轮次指示器 ===== */
   .round-dots {
     position: absolute;
     bottom: 10px;
@@ -199,7 +192,6 @@
 
   .round-dot.active { background: #d4380d; }
 
-  /* ===== 右侧：聊天区域 ===== */
   .right-panel {
     flex: 0 0 40%;
     display: flex;
@@ -269,7 +261,6 @@
     margin-top: 8px;
   }
 
-  /* 聊天区内的菜单按钮 */
   .chat-menu-options {
     display: flex;
     flex-direction: column;
@@ -296,7 +287,6 @@
     transform: translateX(4px);
   }
 
-  /* ===== 快捷按钮栏 ===== */
   .quick-bar {
     padding: 10px 16px 2px;
     display: flex;
@@ -412,7 +402,6 @@
     .chat-input-area input { padding: 10px 14px; font-size: 0.85rem; }
     .btn-send, .btn-voice { width: 38px; height: 38px; font-size: 1rem; }
   }
-  /* 超小屏 */
   @media (max-width: 380px) {
     .left-panel { flex: 0 0 28vh; min-height: 160px; }
     .header-bar h1 { font-size: 1.1rem; letter-spacing: 2px; }
@@ -422,21 +411,18 @@
 <body>
 
 <div class="container">
-  <!-- 左侧：人物 + 气泡 -->
   <div class="left-panel">
     <div class="header-bar">
       <h1>安安 · 工会智能助手</h1>
       <div class="subtitle">维权帮扶 · 关爱职工 · 凝心聚力</div>
     </div>
     <img class="character-img" src="character.png" alt="安安">
-
     <div class="bubble bubble-left" id="bubbleLeft"></div>
     <div class="bubble bubble-right" id="bubbleRight"></div>
     <div class="particle-container" id="particleContainer"></div>
     <div class="round-dots" id="roundDots"></div>
   </div>
 
-  <!-- 右侧：聊天 -->
   <div class="right-panel">
     <div class="chat-header">
       <h2>💬 与轶安安对话</h2>
@@ -566,8 +552,6 @@ function speakAndShow(text) {
   if (!text || !window.speechSynthesis) return;
 
   const MAX_PER_SIDE = 180;
-
-  // 按段落切分轮次
   const paragraphs = text.split('\n').filter(p => p.trim());
   const rounds = [];
   let buf = '';
@@ -584,7 +568,6 @@ function speakAndShow(text) {
 
   let roundIdx = 0;
 
-  // 轮次指示器
   if (rounds.length > 1) {
     roundDots.innerHTML = '';
     for (let i = 0; i < rounds.length; i++) {
@@ -595,7 +578,6 @@ function speakAndShow(text) {
     roundDots.classList.add('visible');
   }
 
-  // 获取语音
   function getVoice() {
     const voices = window.speechSynthesis.getVoices();
     const prefs = ['Microsoft Xiaoxiao','Xiaoxiao','Huihui','Microsoft Huihui','Google 普通话','Ting-Ting'];
@@ -611,7 +593,6 @@ function speakAndShow(text) {
 
   const voice = getVoice();
   const SPEECH_RATE = 0.92;
-  // 打字机速度：跟随语音节奏
   const MS_PER_CHAR = 1000 / (4.5 * SPEECH_RATE);
 
   function playRound() {
@@ -626,13 +607,11 @@ function speakAndShow(text) {
 
     const bubble = side === 'left' ? bubbleLeft : bubbleRight;
 
-    // 创建容器，每个字符一个span
     const innerDiv = document.createElement('div');
     innerDiv.style.cssText = 'position:relative;';
     bubble.appendChild(innerDiv);
     bubble.classList.add('visible');
 
-    // 逐字创建 span
     const charSpans = [];
     for (let i = 0; i < rText.length; i++) {
       const cs = document.createElement('span');
@@ -641,31 +620,24 @@ function speakAndShow(text) {
       innerDiv.appendChild(cs);
       charSpans.push(cs);
     }
-    // 光标
     const cursor = document.createElement('span');
     cursor.className = 'tw-cursor';
     innerDiv.appendChild(cursor);
 
-    // 更新轮次指示器
     const dots = roundDots.querySelectorAll('.round-dot');
     dots.forEach((d, i) => d.classList.toggle('active', i === roundIdx));
 
     isSpeaking = true;
     startParticles();
 
-    // 检查是否需要滚动
     const totalHeight = innerDiv.scrollHeight;
     const visibleHeight = bubble.clientHeight;
     const needsScroll = totalHeight > visibleHeight;
 
-    let currentChar = 0;
-    let scrollProgress = 0; // 0~1
-
-    // 滚动函数：从顶部慢慢滚到底部，循环
     function startAutoScroll() {
       if (!needsScroll) return;
       bubble.scrollTop = 0;
-      const scrollDuration = charSpans.length * MS_PER_CHAR; // 与打字同步
+      const scrollDuration = charSpans.length * MS_PER_CHAR;
       const startTime = performance.now();
       function step(now) {
         const elapsed = now - startTime;
@@ -677,18 +649,14 @@ function speakAndShow(text) {
       scrollAnimId = requestAnimationFrame(step);
     }
 
-    // 逐字显示定时器
     let elapsed = 0;
     for (let i = 0; i < charSpans.length; i++) {
       const t = setTimeout(() => {
         charSpans[i].classList.add('visible');
-        // 高亮当前字
         if (i > 0) charSpans[i-1].classList.remove('active-char');
         charSpans[i].classList.add('active-char');
-        // 光标跟随
         cursor.remove();
         innerDiv.appendChild(cursor);
-        // 如果没有自动滚动，手动跟随滚动
         if (!needsScroll) {
           const cr = cursor.getBoundingClientRect();
           const br = bubble.getBoundingClientRect();
@@ -701,20 +669,17 @@ function speakAndShow(text) {
       elapsed += MS_PER_CHAR;
     }
 
-    // TTS 播报
     const utter = new SpeechSynthesisUtterance(rText);
     utter.lang = 'zh-CN';
     utter.rate = SPEECH_RATE;
     utter.pitch = 1.1;
     if (voice) utter.voice = voice;
 
-    // 语音开始后启动自动滚动
     utter.onstart = () => { startAutoScroll(); };
 
     utter.onend = () => {
       isSpeaking = false;
       stopParticles();
-      // 最后一个字也标记
       if (charSpans.length > 0) {
         charSpans[charSpans.length-1].classList.remove('active-char');
       }
@@ -742,11 +707,34 @@ function speakAndShow(text) {
   playRound();
 }
 
-// ===== 发送消息 =====
+// ===== 发送消息（含手机端语音修复）=====
 async function sendMsg() {
   const text = userInput.value.trim();
   if (!text) return;
   userInput.value = '';
+
+  // 手机端修复：在用户点击的同步代码中创建语音对象并调用 speak()
+  // 手机浏览器要求语音必须由用户手势直接触发，这里先用占位文本"激活"语音引擎
+  let preUtter = null;
+  if (window.speechSynthesis) {
+    try {
+      window.speechSynthesis.cancel();
+      preUtter = new SpeechSynthesisUtterance(' ');
+      preUtter.lang = 'zh-CN';
+      preUtter.rate = 0.92;
+      preUtter.pitch = 1.1;
+      const voices = window.speechSynthesis.getVoices();
+      const prefs = ['Microsoft Xiaoxiao','Xiaoxiao','Huihui','Microsoft Huihui','Google 普通话','Ting-Ting'];
+      let voice = null;
+      for (const name of prefs) {
+        voice = voices.find(v => v.name.includes(name) && v.lang.startsWith('zh'));
+        if (voice) break;
+      }
+      if (!voice) voice = voices.find(v => v.lang.startsWith('zh'));
+      if (voice) preUtter.voice = voice;
+      window.speechSynthesis.speak(preUtter);
+    } catch(e) {}
+  }
 
   addChatMsg(text, 'user');
   const loading = addChatMsg('安安正在查找…', 'bot');
@@ -759,7 +747,6 @@ async function sendMsg() {
     if (data.success && data.answer) {
       const botDiv = addChatMsg(data.answer, 'bot');
 
-      // 来源标签
       if (data.source) {
         const tag = document.createElement('span');
         tag.className = 'source-tag';
@@ -767,8 +754,8 @@ async function sendMsg() {
         botDiv.appendChild(tag);
       }
 
-      // 菜单类型 / 澄清类型 → 显示可点击按钮
       if ((data.type === 'menu' || data.type === 'clarify') && data.menu_items && data.menu_items.length) {
+        if (preUtter) { window.speechSynthesis.cancel(); preUtter = null; }
         const menuDiv = document.createElement('div');
         menuDiv.className = 'chat-menu-options';
         for (const item of data.menu_items) {
@@ -783,22 +770,32 @@ async function sendMsg() {
         }
         botDiv.appendChild(menuDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
-        // 菜单类型：气泡只显示简短提示，不播报
         bubbleLeft.textContent = data.answer.split('\n')[0];
         bubbleRight.textContent = '';
         bubbleLeft.classList.add('visible');
         return;
       }
 
-      // 详情类型 → 语音播报 + 气泡滚动高亮
       if (data.type === 'detail') {
+        // 将预创建语音的文本替换为实际答案，重新播报
+        if (preUtter) {
+          preUtter.text = data.answer;
+          preUtter.onstart = () => { startParticles(); };
+          preUtter.onend = () => { stopParticles(); };
+          preUtter.onerror = () => { stopParticles(); };
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(preUtter);
+        }
+        // 气泡效果（打字机+滚动）
         speakAndShow(data.answer);
       }
 
     } else {
+      if (preUtter) { window.speechSynthesis.cancel(); preUtter = null; }
       addChatMsg('抱歉，未找到相关信息。', 'bot');
     }
   } catch (err) {
+    if (preUtter) { window.speechSynthesis.cancel(); preUtter = null; }
     loading.remove();
     addChatMsg('网络连接失败，请稍后重试。', 'bot');
   }
