@@ -6,450 +6,182 @@
 <title>轶安安 · 中铁二局工会智能助手</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  background: #0a1628;
-  height: 100vh;
-  overflow: hidden;
-  display: flex;
+  background: #0a1628; height: 100vh; overflow: hidden; display: flex;
 }
-
-/* ====== 左侧：角色展示区 ====== */
 .character-area {
-  flex: 0 0 60%;
-  position: relative;
-  overflow: hidden;
+  flex: 0 0 60%; position: relative; overflow: hidden;
   background: linear-gradient(180deg, #d4e8f0 0%, #e8f4f8 40%, #f5f0e8 100%);
 }
-
-/* 角色图片 - 横版适配 */
 .character-img {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: bottom center;
-  animation: float 4s ease-in-out infinite;
-  transition: filter 0.5s ease;
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  object-fit: cover; object-position: center 45%;
 }
-.character-img.speaking {
-  animation: float 2s ease-in-out infinite, speakGlow 1.5s ease-in-out infinite;
-}
-
-/* 浮动动画 */
-@keyframes float {
-  0%, 100% { transform: translateX(-50%) translateY(0); }
-  50% { transform: translateX(-50%) translateY(-8px); }
-}
-
-/* 说话发光 */
-@keyframes speakGlow {
-  0%, 100% { filter: drop-shadow(0 0 20px rgba(192,57,43,0.0)); }
-  50% { filter: drop-shadow(0 0 40px rgba(192,57,43,0.25)); }
-}
-
-/* 顶部标题 */
-.header {
-  position: absolute;
-  top: 28px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  z-index: 10;
-}
-.header h1 {
-  font-size: 32px;
-  font-weight: 700;
-  color: #c0392b;
-  text-shadow: 0 2px 8px rgba(255,255,255,0.8);
-  letter-spacing: 6px;
-}
-.header p {
-  font-size: 14px;
-  color: #666;
-  margin-top: 8px;
-  letter-spacing: 3px;
-}
-
-/* 粒子效果 */
-.particles {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 5;
-}
-.particle {
-  position: absolute;
-  border-radius: 50%;
-  animation: particleFloat linear infinite;
-}
+.header { position: absolute; top: 28px; left: 0; right: 0; text-align: center; z-index: 10; }
+.header h1 { font-size: 32px; font-weight: 700; color: #c0392b; text-shadow: 0 2px 8px rgba(255,255,255,0.8); letter-spacing: 6px; }
+.header p { font-size: 14px; color: #666; margin-top: 8px; letter-spacing: 3px; }
+.particles { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+.particle { position: absolute; border-radius: 50%; animation: particleFloat linear infinite; }
 @keyframes particleFloat {
-  0% { transform: translateY(100%) scale(0); opacity: 0; }
-  15% { opacity: 0.8; transform: translateY(85%) scale(1); }
-  85% { opacity: 0.4; }
-  100% { transform: translateY(-10%) scale(0.2); opacity: 0; }
+  0% { transform: translateY(0) scale(0); opacity: 0; }
+  20% { opacity: 0.9; transform: translateY(-10px) scale(1); }
+  80% { opacity: 0.3; }
+  100% { transform: translateY(-60px) scale(0.1); opacity: 0; }
 }
-
-/* 对话气泡 */
 .speech-bubble {
-  position: absolute;
-  top: 30%;
-  left: 50%;
-  transform: translateX(-50%) scale(0.8);
-  background: rgba(255,255,255,0.95);
-  border: 2px solid #c0392b;
-  border-radius: 20px;
-  padding: 14px 20px;
-  font-size: 15px;
-  color: #333;
-  max-width: 320px;
-  text-align: center;
-  opacity: 0;
-  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  pointer-events: none;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-  z-index: 20;
-  line-height: 1.5;
+  position: absolute; top: 38%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.7);
+  background: rgba(255,255,255,0.96); border: 2.5px solid #c0392b;
+  border-radius: 22px; padding: 16px 24px; font-size: 16px; color: #333;
+  max-width: 380px; text-align: center; opacity: 0; visibility: hidden;
+  transition: all 0.35s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  pointer-events: none; box-shadow: 0 8px 30px rgba(192,57,43,0.15); z-index: 20; line-height: 1.6;
 }
-.speech-bubble.show {
-  opacity: 1;
-  transform: translateX(-50%) scale(1);
-}
+.speech-bubble.show { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
 .speech-bubble::after {
-  content: '';
-  position: absolute;
-  bottom: -12px;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 8px solid transparent;
-  border-top-color: white;
+  content: ''; position: absolute; bottom: -14px; left: 50%; transform: translateX(-50%);
+  border: 10px solid transparent; border-top-color: white;
 }
-
-/* 角色名牌 */
-.name-badge {
-  position: absolute;
-  bottom: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(255,255,255,0.9);
-  border: 2px solid #c0392b;
-  border-radius: 20px;
-  padding: 6px 22px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #c0392b;
-  letter-spacing: 4px;
-  z-index: 15;
-  box-shadow: 0 4px 16px rgba(192,57,43,0.15);
-  backdrop-filter: blur(8px);
+.bubble-particles {
+  position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%);
+  width: 0; height: 0; z-index: 18; pointer-events: none;
 }
-
-/* 底部状态栏 */
+.bubble-particle { position: absolute; width: 5px; height: 5px; border-radius: 50%; opacity: 0; }
+.bubble-particle.active { animation: orbitParticle 1.5s ease-in-out infinite; }
+@keyframes orbitParticle {
+  0% { opacity: 0; transform: rotate(0deg) translateX(180px) rotate(0deg) scale(0); }
+  30% { opacity: 0.8; }
+  70% { opacity: 0.6; }
+  100% { opacity: 0; transform: rotate(360deg) translateX(180px) rotate(-360deg) scale(0.3); }
+}
 .status-bar {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 20px;
-  background: rgba(255,255,255,0.85);
-  border-radius: 24px;
-  backdrop-filter: blur(10px);
-  z-index: 10;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; padding: 8px 20px;
+  background: rgba(255,255,255,0.85); border-radius: 24px;
+  backdrop-filter: blur(10px); z-index: 10; box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
-.status-dot {
-  width: 10px; height: 10px;
-  background: #27ae60;
-  border-radius: 50%;
-  animation: dotPulse 2s infinite;
+.status-dot { width: 10px; height: 10px; background: #27ae60; border-radius: 50%; animation: dotPulse 2s infinite; }
+.status-dot.speaking { background: #c0392b; animation: dotPulse 0.6s infinite; }
+@keyframes dotPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.status-text { font-size: 13px; color: #555; }
+.voice-selector { display: flex; align-items: center; gap: 4px; margin-left: 8px; }
+.voice-selector select {
+  padding: 2px 6px; border: 1px solid #ddd; border-radius: 10px;
+  font-size: 11px; color: #555; background: white; outline: none; cursor: pointer;
 }
-.status-dot.speaking {
-  background: #c0392b;
-  animation: dotPulse 0.6s infinite;
-}
-@keyframes dotPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-.status-text {
-  font-size: 13px;
-  color: #555;
-}
-
-/* 语音波形 */
-.voice-wave {
-  display: none;
-  align-items: center;
-  gap: 3px;
-  margin-left: 4px;
-}
+.voice-wave { display: none; align-items: center; gap: 3px; margin-left: 4px; }
 .voice-wave.active { display: flex; }
-.voice-wave .bar {
-  width: 3px;
-  background: #c0392b;
-  border-radius: 2px;
-  animation: wave 0.8s ease-in-out infinite;
-}
+.voice-wave .bar { width: 3px; background: #c0392b; border-radius: 2px; animation: wave 0.8s ease-in-out infinite; }
 .voice-wave .bar:nth-child(1) { height: 10px; animation-delay: 0s; }
 .voice-wave .bar:nth-child(2) { height: 16px; animation-delay: 0.1s; }
 .voice-wave .bar:nth-child(3) { height: 22px; animation-delay: 0.2s; }
 .voice-wave .bar:nth-child(4) { height: 16px; animation-delay: 0.3s; }
 .voice-wave .bar:nth-child(5) { height: 10px; animation-delay: 0.4s; }
-@keyframes wave {
-  0%, 100% { transform: scaleY(0.5); }
-  50% { transform: scaleY(1.3); }
-}
-
-/* ====== 右侧：聊天区 ====== */
+@keyframes wave { 0%, 100% { transform: scaleY(0.5); } 50% { transform: scaleY(1.3); } }
 .chat-area {
-  flex: 0 0 40%;
-  display: flex;
-  flex-direction: column;
-  background: rgba(255,255,255,0.95);
-  backdrop-filter: blur(16px);
-  border-left: 1px solid rgba(0,0,0,0.06);
-  box-shadow: -4px 0 30px rgba(0,0,0,0.08);
+  flex: 0 0 40%; display: flex; flex-direction: column;
+  background: rgba(255,255,255,0.95); backdrop-filter: blur(16px);
+  border-left: 1px solid rgba(0,0,0,0.06); box-shadow: -4px 0 30px rgba(0,0,0,0.08);
 }
-
 .chat-header {
-  padding: 22px 24px;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
-  background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
-  color: white;
+  padding: 22px 24px; border-bottom: 1px solid rgba(0,0,0,0.06);
+  background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%); color: white;
 }
 .chat-header h2 { font-size: 18px; font-weight: 600; }
 .chat-header p { font-size: 12px; opacity: 0.85; margin-top: 4px; }
-
-/* 消息列表 */
-.messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
+.messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
 .messages::-webkit-scrollbar { width: 4px; }
 .messages::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
-
-.message {
-  display: flex;
-  gap: 10px;
-  animation: msgIn 0.3s ease-out;
-}
-@keyframes msgIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+.message { display: flex; gap: 10px; animation: msgIn 0.3s ease-out; }
+@keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .message.user { flex-direction: row-reverse; }
 .message .avatar {
-  width: 36px; height: 36px;
-  border-radius: 50%;
+  width: 36px; height: 36px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 16px;
-  flex-shrink: 0;
+  font-size: 14px; font-weight: 600; flex-shrink: 0;
 }
-.message.bot .avatar { background: linear-gradient(135deg, #c0392b, #e74c3c); color: white; font-size: 14px; font-weight: 600; }
+.message.bot .avatar { background: linear-gradient(135deg, #c0392b, #e74c3c); color: white; }
 .message.user .avatar { background: linear-gradient(135deg, #3498db, #2980b9); color: white; }
-.message .bubble {
-  max-width: 80%;
-  padding: 12px 16px;
-  border-radius: 16px;
-  font-size: 14px;
-  line-height: 1.7;
-  word-break: break-word;
-}
-.message.bot .bubble {
-  background: #f8f9fa;
-  color: #333;
-  border-bottom-left-radius: 4px;
-}
-.message.user .bubble {
-  background: linear-gradient(135deg, #3498db, #2980b9);
-  color: white;
-  border-bottom-right-radius: 4px;
-}
-.bubble .source {
-  display: block;
-  margin-top: 8px;
-  font-size: 11px;
-  color: #999;
-  border-top: 1px solid #eee;
-  padding-top: 6px;
-}
+.message .bubble { max-width: 80%; padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.7; word-break: break-word; }
+.message.bot .bubble { background: #f8f9fa; color: #333; border-bottom-left-radius: 4px; }
+.message.user .bubble { background: linear-gradient(135deg, #3498db, #2980b9); color: white; border-bottom-right-radius: 4px; }
+.bubble .source { display: block; margin-top: 8px; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 6px; }
 .message.user .bubble .source { color: rgba(255,255,255,0.7); border-top-color: rgba(255,255,255,0.2); }
-
-/* 快捷问题 */
-.quick-questions {
-  padding: 12px 20px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  border-top: 1px solid rgba(0,0,0,0.04);
-}
-.quick-btn {
-  padding: 6px 14px;
-  border: 1px solid #e0e0e0;
-  border-radius: 16px;
-  font-size: 12px;
-  color: #666;
-  background: white;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.quick-btn:hover {
-  border-color: #c0392b;
-  color: #c0392b;
-  background: #fef6f5;
-}
-
-/* 打字动画 */
-.typing-indicator span {
-  display: inline-block;
-  width: 6px; height: 6px;
-  background: #999;
-  border-radius: 50%;
-  margin: 0 2px;
-  animation: typing 1.4s infinite;
-}
+.quick-questions { padding: 12px 20px; display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid rgba(0,0,0,0.04); }
+.quick-btn { padding: 6px 14px; border: 1px solid #e0e0e0; border-radius: 16px; font-size: 12px; color: #666; background: white; cursor: pointer; transition: all 0.2s; }
+.quick-btn:hover { border-color: #c0392b; color: #c0392b; background: #fef6f5; }
+.typing-indicator span { display: inline-block; width: 6px; height: 6px; background: #999; border-radius: 50%; margin: 0 2px; animation: typing 1.4s infinite; }
 .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
 .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes typing {
-  0%, 60%, 100% { transform: translateY(0); }
-  30% { transform: translateY(-6px); }
-}
-
-/* 输入区 */
-.input-area {
-  padding: 16px 20px;
-  border-top: 1px solid rgba(0,0,0,0.06);
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.input-area input {
-  flex: 1;
-  padding: 12px 18px;
-  border: 2px solid #e0e0e0;
-  border-radius: 24px;
-  font-size: 14px;
-  outline: none;
-  transition: border-color 0.3s;
-}
+@keyframes typing { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+.input-area { padding: 16px 20px; border-top: 1px solid rgba(0,0,0,0.06); display: flex; gap: 10px; align-items: center; }
+.input-area input { flex: 1; padding: 12px 18px; border: 2px solid #e0e0e0; border-radius: 24px; font-size: 14px; outline: none; transition: border-color 0.3s; }
 .input-area input:focus { border-color: #c0392b; }
 .input-area input::placeholder { color: #bbb; }
-
-.send-btn, .voice-btn {
-  width: 44px; height: 44px;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.3s;
-  flex-shrink: 0;
-  font-size: 16px;
-}
-.send-btn {
-  background: linear-gradient(135deg, #c0392b, #e74c3c);
-  color: white;
-}
+.send-btn, .voice-btn { width: 44px; height: 44px; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; flex-shrink: 0; font-size: 16px; }
+.send-btn { background: linear-gradient(135deg, #c0392b, #e74c3c); color: white; }
 .send-btn:hover { transform: scale(1.08); box-shadow: 0 4px 12px rgba(192,57,43,0.4); }
 .send-btn:active { transform: scale(0.95); }
-.voice-btn {
-  background: #f0f0f0;
-  color: #666;
-}
+.voice-btn { background: #f0f0f0; color: #666; }
 .voice-btn:hover { background: #e8e8e8; }
-.voice-btn.active {
-  background: linear-gradient(135deg, #c0392b, #e74c3c);
-  color: white;
-  animation: micPulse 1s infinite;
-}
-@keyframes micPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(192,57,43,0); }
-}
-
-/* 响应式 */
-@media (max-width: 1024px) {
-  .header h1 { font-size: 24px; }
-  .character-area { flex: 0 0 50%; }
-  .chat-area { flex: 0 0 50%; }
-}
-@media (max-width: 768px) {
-  body { flex-direction: column; }
-  .character-area { flex: 0 0 auto; height: 35vh; }
-  .chat-area { flex: 1; }
-}
+.voice-btn.active { background: linear-gradient(135deg, #c0392b, #e74c3c); color: white; animation: micPulse 1s infinite; }
+@keyframes micPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.4); } 50% { box-shadow: 0 0 0 8px rgba(192,57,43,0); } }
+@media (max-width: 1024px) { .header h1 { font-size: 24px; } .character-area { flex: 0 0 50%; } .chat-area { flex: 0 0 50%; } }
+@media (max-width: 768px) { body { flex-direction: column; } .character-area { flex: 0 0 auto; height: 35vh; } .chat-area { flex: 1; } }
 </style>
 </head>
 <body>
-
-<!-- 左侧：角色展示 -->
 <div class="character-area">
   <div class="header">
     <h1>轶安安 · 工会智能助手</h1>
     <p>维权帮扶 · 关爱职工 · 凝心聚力</p>
   </div>
-
   <div class="particles" id="particles"></div>
   <img class="character-img" id="characterImg" src="character.png" alt="轶安安">
-  <div class="name-badge">轶安安</div>
+  <div class="bubble-particles" id="bubbleParticles"></div>
   <div class="speech-bubble" id="speechBubble"></div>
-
   <div class="status-bar">
     <div class="status-dot" id="statusDot"></div>
     <span class="status-text" id="statusText">在线 · 随时为您服务</span>
+    <div class="voice-selector">
+      <select id="voiceSelect" title="选择语音">
+        <option value="xiaoxiao">温柔女声</option>
+        <option value="yunxi">年轻男声</option>
+        <option value="yunyang">新闻主播</option>
+        <option value="xiaoyi">活泼女声</option>
+      </select>
+    </div>
     <div class="voice-wave" id="voiceWave">
       <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
     </div>
   </div>
 </div>
-
-<!-- 右侧：聊天区 -->
 <div class="chat-area">
   <div class="chat-header">
     <h2>💬 轶安安 · 智能问答</h2>
     <p>关于工会福利、帮扶救助等问题，请随时提问</p>
   </div>
-
   <div class="messages" id="messages">
     <div class="message bot">
       <div class="avatar">安</div>
-      <div class="bubble">
-        您好！我是<b>轶安安</b>，中铁二局工会智能助手，可以为您解答关于工会福利、关爱服务、帮扶救助等方面的问题。请问有什么可以帮助您的？
-      </div>
+      <div class="bubble">您好！我是<b>轶安安</b>，中铁二局工会智能助手，可以为您解答关于工会福利、关爱服务、帮扶救助等方面的问题。请问有什么可以帮助您的？</div>
     </div>
   </div>
-
   <div class="quick-questions">
     <button class="quick-btn" data-q="工会福利有哪些">工会福利有哪些</button>
     <button class="quick-btn" data-q="如何申请帮扶救助">如何申请帮扶救助</button>
     <button class="quick-btn" data-q="三不让承诺是什么">三不让承诺</button>
     <button class="quick-btn" data-q="职工关爱服务包括哪些">关爱服务</button>
   </div>
-
   <div class="input-area">
     <button class="voice-btn" id="voiceBtn" title="语音输入">🎤</button>
     <input type="text" id="questionInput" placeholder="输入您的问题..." autocomplete="off">
     <button class="send-btn" id="sendBtn" title="发送">➤</button>
   </div>
 </div>
-
 <script>
-// ====== 配置 ======
 const API_BASE = 'https://web-production-55858.up.railway.app';
-const TTS_ENABLED = true;
-
-// ====== DOM ======
 const messagesEl = document.getElementById('messages');
 const inputEl = document.getElementById('questionInput');
 const sendBtn = document.getElementById('sendBtn');
@@ -459,84 +191,96 @@ const statusText = document.getElementById('statusText');
 const characterImg = document.getElementById('characterImg');
 const speechBubble = document.getElementById('speechBubble');
 const voiceWave = document.getElementById('voiceWave');
+const bubbleParticlesEl = document.getElementById('bubbleParticles');
+const voiceSelect = document.getElementById('voiceSelect');
 
-// ====== 粒子效果 ======
+// 背景粒子
 function createParticles() {
   const container = document.getElementById('particles');
   const colors = ['rgba(192,57,43,0.5)', 'rgba(231,76,60,0.4)', 'rgba(52,152,219,0.3)', 'rgba(241,196,15,0.4)'];
-  for (let i = 0; i < 15; i++) {
+  for (let i = 0; i < 12; i++) {
     const p = document.createElement('div');
     p.className = 'particle';
     p.style.left = (Math.random() * 100) + '%';
-    p.style.animationDuration = (4 + Math.random() * 6) + 's';
+    p.style.bottom = '0';
+    p.style.animationDuration = (5 + Math.random() * 8) + 's';
     p.style.animationDelay = (Math.random() * 5) + 's';
     const size = (4 + Math.random() * 8) + 'px';
-    p.style.width = size;
-    p.style.height = size;
+    p.style.width = size; p.style.height = size;
     p.style.background = colors[Math.floor(Math.random() * colors.length)];
     container.appendChild(p);
   }
 }
 createParticles();
 
-// ====== 语音播报 ======
-let currentUtterance = null;
+// 气泡粒子
+function createBubbleParticles() {
+  const colors = ['#c0392b', '#e74c3c', '#f39c12', '#e67e22', '#c0392b'];
+  for (let i = 0; i < 10; i++) {
+    const p = document.createElement('div');
+    p.className = 'bubble-particle';
+    p.style.transform = 'rotate(' + (i * 36) + 'deg) translateX(180px)';
+    p.style.background = colors[i % colors.length];
+    p.style.animationDelay = (i * 0.15) + 's';
+    const size = (3 + Math.random() * 4) + 'px';
+    p.style.width = size; p.style.height = size;
+    bubbleParticlesEl.appendChild(p);
+  }
+}
+createBubbleParticles();
+
+function toggleBubbleParticles(show) {
+  document.querySelectorAll('.bubble-particle').forEach(p => {
+    if (show) { p.classList.add('active'); p.style.animationDelay = (Math.random() * 0.5) + 's'; }
+    else { p.classList.remove('active'); }
+  });
+}
+
+// Edge TTS 语音播报
+let currentAudio = null;
 let isSpeaking = false;
 
 function speak(text) {
-  if (!TTS_ENABLED || !('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  const speakText = text.length > 400 ? text.substring(0, 400) + '……以上是主要内容。' : text;
+  const voice = voiceSelect.value;
 
-  const speakText = text.length > 300 ? text.substring(0, 300) + '……以上是主要内容。' : text;
-  const utterance = new SpeechSynthesisUtterance(speakText);
-  utterance.lang = 'zh-CN';
-  utterance.rate = 1.0;
-  utterance.pitch = 1.1;
+  speechBubble.textContent = speakText;
+  speechBubble.classList.add('show');
+  toggleBubbleParticles(true);
+  isSpeaking = true;
+  statusDot.classList.add('speaking');
+  statusText.textContent = '正在语音播报...';
+  voiceWave.classList.add('active');
 
-  const voices = window.speechSynthesis.getVoices();
-  const zhVoice = voices.find(v => v.lang.startsWith('zh') && v.name.toLowerCase().includes('female'))
-    || voices.find(v => v.lang.startsWith('zh'))
-    || voices[0];
-  if (zhVoice) utterance.voice = zhVoice;
+  const audio = new Audio(API_BASE + '/api/tts?text=' + encodeURIComponent(speakText) + '&voice=' + voice);
+  currentAudio = audio;
 
-  currentUtterance = utterance;
-
-  utterance.onstart = () => {
-    isSpeaking = true;
-    characterImg.classList.add('speaking');
-    statusDot.classList.add('speaking');
-    statusText.textContent = '正在语音播报...';
-    voiceWave.classList.add('active');
-  };
-
-  const stopAnim = () => {
+  audio.onended = () => {
     isSpeaking = false;
-    characterImg.classList.remove('speaking');
     statusDot.classList.remove('speaking');
     statusText.textContent = '在线 · 随时为您服务';
     voiceWave.classList.remove('active');
+    speechBubble.classList.remove('show');
+    toggleBubbleParticles(false);
+    currentAudio = null;
   };
-  utterance.onend = stopAnim;
-  utterance.onerror = stopAnim;
-
-  window.speechSynthesis.speak(utterance);
+  audio.onerror = audio.onended;
+  audio.play().catch(() => audio.onerror());
 }
 
 function stopSpeaking() {
-  if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  isSpeaking = false;
+  statusDot.classList.remove('speaking');
+  statusText.textContent = '在线 · 随时为您服务';
+  voiceWave.classList.remove('active');
+  speechBubble.classList.remove('show');
+  toggleBubbleParticles(false);
 }
 
-if ('speechSynthesis' in window) {
-  window.speechSynthesis.getVoices();
-  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-}
-
-// ====== 消息管理 ======
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
+// 消息管理
+function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
 
 function addMessage(type, content, source) {
   const msg = document.createElement('div');
@@ -580,32 +324,20 @@ function removeTypingIndicator() {
   if (el) el.remove();
 }
 
-// ====== 对话气泡 ======
-function showSpeechBubble(text) {
-  const short = text.length > 50 ? text.substring(0, 50) + '...' : text;
-  speechBubble.textContent = short;
-  speechBubble.classList.add('show');
-  clearTimeout(speechBubble._timer);
-  speechBubble._timer = setTimeout(() => speechBubble.classList.remove('show'), 6000);
-}
-
-// ====== 问答核心 ======
+// 问答核心
 async function askQuestion(question) {
   if (!question.trim()) return;
   stopSpeaking();
   addMessage('user', escapeHtml(question));
   addTypingIndicator();
   statusText.textContent = '正在查询知识库...';
-
   try {
-    const resp = await fetch(`${API_BASE}/api/ask?question=${encodeURIComponent(question)}`);
+    const resp = await fetch(API_BASE + '/api/ask?question=' + encodeURIComponent(question));
     const data = await resp.json();
     removeTypingIndicator();
-
     if (data.success) {
       const answerHtml = escapeHtml(data.answer).replace(/\n/g, '<br>');
       addMessage('bot', answerHtml, data.source || '');
-      showSpeechBubble(data.answer);
       speak(data.answer);
     } else {
       addMessage('bot', '抱歉，查询时出现了问题，请稍后再试。');
@@ -614,72 +346,33 @@ async function askQuestion(question) {
     removeTypingIndicator();
     addMessage('bot', '网络连接失败，请检查网络后重试。');
   }
-
-  statusText.textContent = '在线 · 随时为您服务';
+  if (!isSpeaking) statusText.textContent = '在线 · 随时为您服务';
   inputEl.value = '';
   inputEl.focus();
 }
 
-// ====== 事件绑定 ======
 sendBtn.addEventListener('click', () => askQuestion(inputEl.value));
-inputEl.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askQuestion(inputEl.value); }
-});
+inputEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askQuestion(inputEl.value); } });
+characterImg.addEventListener('click', () => { if (isSpeaking) stopSpeaking(); });
+document.querySelectorAll('.quick-btn').forEach(btn => btn.addEventListener('click', () => askQuestion(btn.dataset.q)));
 
-// 点击角色停止语音
-characterImg.addEventListener('click', () => {
-  if (isSpeaking) stopSpeaking();
-});
-
-// 快捷问题
-document.querySelectorAll('.quick-btn').forEach(btn => {
-  btn.addEventListener('click', () => askQuestion(btn.dataset.q));
-});
-
-// ====== 语音输入 ======
+// 语音输入
 let recognition = null;
 let isListening = false;
-
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SpeechRecognition();
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
   recognition.lang = 'zh-CN';
   recognition.continuous = false;
   recognition.interimResults = true;
-
-  recognition.onresult = (event) => {
-    let transcript = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      transcript += event.results[i][0].transcript;
-    }
-    inputEl.value = transcript;
-  };
-  recognition.onend = () => {
-    isListening = false;
-    voiceBtn.classList.remove('active');
-    voiceBtn.innerHTML = '🎤';
-    if (inputEl.value.trim()) askQuestion(inputEl.value);
-  };
-  recognition.onerror = () => {
-    isListening = false;
-    voiceBtn.classList.remove('active');
-    voiceBtn.innerHTML = '🎤';
-  };
+  recognition.onresult = (e) => { let t = ''; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript; inputEl.value = t; };
+  recognition.onend = () => { isListening = false; voiceBtn.classList.remove('active'); voiceBtn.innerHTML = '🎤'; if (inputEl.value.trim()) askQuestion(inputEl.value); };
+  recognition.onerror = () => { isListening = false; voiceBtn.classList.remove('active'); voiceBtn.innerHTML = '🎤'; };
   voiceBtn.addEventListener('click', () => {
     if (isListening) { recognition.stop(); }
-    else {
-      isListening = true;
-      voiceBtn.classList.add('active');
-      voiceBtn.innerHTML = '⏹';
-      recognition.start();
-    }
+    else { isListening = true; voiceBtn.classList.add('active'); voiceBtn.innerHTML = '⏹'; recognition.start(); }
   });
-} else {
-  voiceBtn.title = '当前浏览器不支持语音输入';
-  voiceBtn.style.opacity = '0.5';
-}
+} else { voiceBtn.title = '当前浏览器不支持语音输入'; voiceBtn.style.opacity = '0.5'; }
 </script>
 </body>
 </html>
-
- 
