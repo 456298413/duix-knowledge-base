@@ -64,7 +64,7 @@
                 <h3>配置信息</h3>
                 <div class="config-section">
                     <label>知识库 API 地址</label>
-                    <input type="text" id="apiUrl" value="https://web-production-55858.up.railway.app">
+                    <input type="text" id="apiUrl" value="https://web-production-55858.up.railway.app" placeholder="如 https://your-api.onrender.com">
                 </div>
                 <div class="config-section" style="margin-top:8px">
                     <label>DUIX appId</label>
@@ -90,15 +90,18 @@
 
     <script src="./duix.js"></script>
     <script>
-        var duix = null;
-        var duixReady = false;
+        let duix = null;
+        let duixReady = false;
+        let kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
 
-        // 检查知识库连接
+        document.getElementById('appId').value = '1539357019641876480';
+        document.getElementById('appKey').value = '7bf9f999-d214-441d-91dd-3833d0bb24be';
+
         async function checkKB() {
             try {
-                var kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
-                var resp = await fetch(kbApiUrl + '/api/health');
-                var data = await resp.json();
+                kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+                const resp = await fetch(kbApiUrl + '/api/health');
+                const data = await resp.json();
                 document.getElementById('kbStatus').className = 'status connected';
                 document.getElementById('kbStatus').textContent = '已连接 (' + data.total_entries + '条)';
             } catch (e) {
@@ -107,10 +110,10 @@
             }
         }
 
-        // 初始化 DUIX
-        function initDUIX() {
-            var DUIX = window.Duix || window.DUIX;
+        async function initDUIX() {
+            const DUIX = window.Duix || window.DUIX;
             if (!DUIX) {
+                console.warn('DUIX SDK 未加载');
                 document.getElementById('duixStatus').className = 'status disconnected';
                 document.getElementById('duixStatus').textContent = 'SDK未加载';
                 checkKB();
@@ -118,70 +121,54 @@
             }
 
             duix = new DUIX();
-
-            // ★ 关键：start() 必须在 initialSuccess 事件里调用
-            duix.on('initialSuccess', function() {
-                console.log('DUIX initialSuccess 事件触发，开始调用 start()');
-                duix.start({
-                    muted: true,
-                    openAsr: false
-                }).then(function(res) {
-                    console.log('DUIX start 返回:', JSON.stringify(res));
-                    if (res.err) {
-                        console.error('start 失败:', JSON.stringify(res.err));
-                        document.getElementById('duixStatus').textContent = '启动失败';
-                    }
-                });
-            });
-
-            duix.on('show', function() {
-                console.log('DUIX 数字人已显示');
-                duixReady = true;
-                document.getElementById('duixStatus').className = 'status connected';
-                document.getElementById('duixStatus').textContent = '已连接';
-            });
-
-            duix.on('progress', function(p) {
-                console.log('DUIX 加载进度:', p);
-            });
-
-            duix.on('error', function(err) {
-                console.error('DUIX 错误:', err);
-                document.getElementById('duixStatus').className = 'status disconnected';
-                document.getElementById('duixStatus').textContent = '连接失败';
-            });
-
-            duix.on('speakStart', function(data) {
-                console.log('数字人开始说话:', data.content);
-            });
-            duix.on('speakEnd', function(data) {
-                console.log('数字人说话结束:', data.content);
-            });
-
             var conversationId = '2089675482202521601';
 
-            console.log('开始 duix.init(), conversationId:', conversationId);
-            duix.init({
-                appId: document.getElementById('appId').value,
-                appKey: document.getElementById('appKey').value,
-                containerLable: '#duix-container',
-                platform: 'duix.com',
-                conversationId: conversationId
-            }).then(function(data) {
-                console.log('DUIX init 返回:', JSON.stringify(data));
-            }).catch(function(err) {
-                console.error('DUIX init 失败:', err);
+            var initTimer = setTimeout(function() {
+                document.getElementById('duixStatus').className = 'status disconnected';
+                document.getElementById('duixStatus').textContent = '初始化超时';
+                console.error('DUIX init 超时');
+            }, 20000);
+
+            try {
+                await duix.init({
+                    appId: document.getElementById('appId').value,
+                    appKey: document.getElementById('appKey').value,
+                    containerLable: '#duix-container',
+                    platform: 'duix.com',
+                    conversationId: conversationId
+                });
+                clearTimeout(initTimer);
+                console.log('DUIX init 成功');
+
+                document.getElementById('duixStatus').className = 'status loading';
+                document.getElementById('duixStatus').textContent = '启动中...';
+
+                var startRes = await duix.start({ muted: true, openAsr: false });
+                console.log('DUIX start 结果:', JSON.stringify(startRes));
+
+                if (startRes && startRes.err) {
+                    console.error('start 失败:', startRes.err);
+                    document.getElementById('duixStatus').className = 'status disconnected';
+                    document.getElementById('duixStatus').textContent = '启动失败: ' + startRes.err;
+                } else {
+                    console.log('DUIX start 成功');
+                    duixReady = true;
+                    document.getElementById('duixStatus').className = 'status connected';
+                    document.getElementById('duixStatus').textContent = '已连接';
+                }
+            } catch (err) {
+                clearTimeout(initTimer);
+                console.error('DUIX 错误:', err);
                 document.getElementById('duixStatus').className = 'status disconnected';
                 document.getElementById('duixStatus').textContent = '初始化失败';
-            });
+            }
 
             checkKB();
         }
 
-        // 问答功能
         async function queryKB(question) {
-            var kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
-            var resp = await fetch(kbApiUrl + '/api/ask', {
+            kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+            const resp = await fetch(kbApiUrl + '/api/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ question: question })
