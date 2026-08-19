@@ -1,10 +1,7 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import json
 import os
-import io
-import edge_tts
-import asyncio
 
 app = Flask(__name__)
 CORS(app)
@@ -23,13 +20,6 @@ else:
 with open(KB_PATH, 'r', encoding='utf-8') as f:
     kb_data = json.load(f)
 knowledge_base = kb_data['entries']
-
-VOICES = {
-    'xiaoxiao': 'zh-CN-XiaoxiaoNeural',
-    'yunxi': 'zh-CN-YunxiNeural',
-    'yunyang': 'zh-CN-YunyangNeural',
-    'xiaoyi': 'zh-CN-XiaoyiNeural'
-}
 
 def fuzzy_match(question, entry):
     q = question.lower()
@@ -80,31 +70,6 @@ def health():
 @app.route('/api/sources', methods=['GET'])
 def sources():
     return jsonify({'sources': list(set(e.get('source', '') for e in knowledge_base))})
-
-@app.route('/api/tts', methods=['GET'])
-def tts():
-    text = request.args.get('text', '').strip()
-    voice = request.args.get('voice', 'xiaoxiao').strip().lower()
-    if not text:
-        return jsonify({'error': 'text is required'}), 400
-    if len(text) > 500:
-        text = text[:500]
-    voice_id = VOICES.get(voice, VOICES['xiaoxiao'])
-    try:
-        async def generate():
-            communicate = edge_tts.Communicate(text, voice_id)
-            audio_data = bytearray()
-            async for chunk in communicate.stream():
-                if chunk['type'] == 'audio':
-                    audio_data.extend(chunk['data'])
-            return bytes(audio_data)
-        audio_bytes = asyncio.run(generate())
-        buf = io.BytesIO(audio_bytes)
-        buf.seek(0)
-        return send_file(buf, mimetype='audio/mpeg',
-                         headers={'Access-Control-Allow-Origin': '*'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
