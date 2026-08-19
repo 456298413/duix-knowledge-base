@@ -1,186 +1,264 @@
-#!/usr/bin/env python3
-"""
-工会知识库 API 服务
-提供问答接口，支持 CORS，可部署到 Render/Railway 等免费云平台
-"""
-import json
-import os
-import re
-import time
-import jwt
-from datetime import datetime, timezone, timedelta
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-
-app = Flask(__name__)
-CORS(app)
-
-DUIX_APP_ID = os.environ.get('DUIX_APP_ID', '1539357019641876480')
-DUIX_APP_KEY = os.environ.get('DUIX_APP_KEY', '7bf9f999-d214-441d-91dd-3833d0bb24be')
-
-_base_dir = os.path.dirname(os.path.abspath(__file__))
-KB_PATH = os.path.join(_base_dir, 'knowledge_base', 'knowledge_base.json')
-if not os.path.exists(KB_PATH):
-    KB_PATH = os.path.join(_base_dir, 'knowledge_base.json')
-
-with open(KB_PATH, 'r', encoding='utf-8') as f:
-    KB = json.load(f)
-
-ENTRIES = KB['entries']
-
-
-def search_knowledge_base(question: str, top_k: int = 3) -> list:
-    question = question.strip()
-    if not question:
-        return []
-
-    chinese_text = re.sub(r'[^\u4e00-\u9fa5]', '', question)
-    if not chinese_text:
-        return []
-
-    q_words = set()
-    for i in range(len(chinese_text) - 1):
-        q_words.add(chinese_text[i:i+2])
-    long_phrases = set()
-    for length in range(4, min(len(chinese_text) + 1, 7)):
-        for i in range(len(chinese_text) - length + 1):
-            long_phrases.add(chinese_text[i:i + length])
-
-    scored = []
-    for entry in ENTRIES:
-        score = 0
-        entry_text = entry['title'] + ' ' + entry['content'] + ' ' + ' '.join(entry.get('keywords', []))
-
-        hit_count = sum(1 for w in q_words if w in entry_text)
-        if q_words:
-            score += hit_count / len(q_words) * 50
-
-        kw_list = entry.get('keywords', [])
-        kw_score = 0
-        for kw in kw_list:
-            if len(kw) <= 3:
-                if any(kw == w or kw in w for w in q_words):
-                    kw_score += 8
-            else:
-                hit_by_qw = sum(1 for w in q_words if w in kw)
-                if hit_by_qw >= 2:
-                    kw_score += 8
-        score += kw_score
-
-        for lp in long_phrases:
-            if lp in entry_text:
-                score += len(lp) * 8
-            if lp in entry['title']:
-                score += len(lp) * 12
-
-        chapter = entry.get('chapter', '')
-        for w in q_words:
-            if w in chapter:
-                score += 5
-
-        source_file = entry.get('source_file', '')
-        source_title = entry.get('source_title', '')
-        source_combined = source_file + ' ' + source_title
-        topic_rules = [
-            (['福利', '关爱', '慰问', '入职', '结婚', '生育', '退休', '困难', '帮扶', '生日', '生病', '休假'], '福利梳理', 35),
-            (['财务', '经费', '预算', '支出', '收入'], '财务管理', 25),
-            (['帮扶', '救助', '三不让'], '三不让', 25),
-            (['关爱', '生涯'], '关爱服务', 25),
-        ]
-        for keywords, file_marker, bonus in topic_rules:
-            if any(ww in question for ww in keywords) and file_marker in source_combined:
-                score += bonus
-                break
-
-        if score > 0:
-            scored.append((score, entry))
-
-    scored.sort(key=lambda x: -x[0])
-
-    results = []
-    for score, entry in scored[:top_k]:
-        max_possible = 40 + len(entry.get('keywords', [])) * 5 + 15 + 10 + 3 * 5
-        confidence = min(score / max(max_possible, 1) * 100, 100)
-        confidence = round(confidence, 1)
-        results.append({
-            'answer': entry['content'][:2000],
-            'source': entry['source_title'],
-            'source_file': entry['source_file'],
-            'chapter': entry['chapter'],
-            'confidence': confidence
-        })
-    return results
-
-
-@app.route('/api/ask', methods=['POST', 'GET'])
-def ask():
-    if request.method == 'POST':
-        data = request.get_json(silent=True) or {}
-        question = data.get('question', '').strip()
-    else:
-        question = request.args.get('question', '').strip()
-
-    if not question:
-        return jsonify({'success': False, 'error': '请提供问题参数 question'}), 400
-
-    try:
-        results = search_knowledge_base(question)
-    except Exception as e:
-        import traceback
-        print("search_knowledge_base 出错:", traceback.format_exc())
-        return jsonify({'success': False, 'error': '知识库检索出错: ' + str(e)}), 500
-
-    if not results:
-        return jsonify({
-            'success': True,
-            'answer': '未在知识库中找到与您问题相关的信息。知识库仅包含工会福利、关爱服务、帮扶救助、财务管理相关文件内容。',
-            'source': '', 'source_file': '', 'chapter': '', 'confidence': 0, 'related': []
-        })
-
-    best = results[0]
-    return jsonify({
-        'success': True,
-        'answer': best['answer'],
-        'source': best['source'],
-        'source_file': best['source_file'],
-        'chapter': best['chapter'],
-        'confidence': best['confidence'],
-        'related': results[1:]
-    })
-
-
-@app.route('/api/sign', methods=['GET'])
-def get_sign():
-    try:
-        payload = {
-            'appId': DUIX_APP_ID,
-            'iat': int(time.time()),
-            'exp': int(time.time()) + 1800
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工会知识库 - 数字人问答</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; display: flex; gap: 20px; min-height: 100vh; }
+        .left-panel { flex: 1; background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; display: flex; flex-direction: column; }
+        .right-panel { width: 400px; display: flex; flex-direction: column; gap: 16px; }
+        .duix-container { flex: 1; min-height: 500px; background: #000; border-radius: 12px 12px 0 0; position: relative; }
+        #duix-container { width: 100%; height: 100%; }
+        .chat-area { padding: 16px; flex: 1; overflow-y: auto; max-height: 300px; }
+        .chat-msg { margin-bottom: 12px; padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.6; }
+        .chat-msg.user { background: #4f8cff; color: #fff; margin-left: 60px; border-bottom-right-radius: 4px; }
+        .chat-msg.bot { background: #f0f2f5; color: #333; margin-right: 60px; border-bottom-left-radius: 4px; }
+        .chat-msg .source { font-size: 12px; color: #888; margin-top: 6px; }
+        .input-area { padding: 16px; border-top: 1px solid #eee; display: flex; gap: 10px; }
+        .input-area input { flex: 1; padding: 10px 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+        .input-area input:focus { border-color: #4f8cff; }
+        .input-area button { padding: 10px 24px; background: #4f8cff; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
+        .input-area button:hover { background: #3d7ae8; }
+        .input-area button:disabled { background: #ccc; cursor: not-allowed; }
+        .info-card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+        .info-card h3 { font-size: 15px; margin-bottom: 10px; color: #333; }
+        .info-card p { font-size: 13px; color: #666; line-height: 1.6; }
+        .status { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; }
+        .status.connected { background: #e6f7ee; color: #52c41a; }
+        .status.disconnected { background: #fff2f0; color: #ff4d4f; }
+        .status.loading { background: #fff7e6; color: #fa8c16; }
+        .config-section { margin-top: 12px; }
+        .config-section label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
+        .config-section input { width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+        @media (max-width: 768px) {
+            .container { flex-direction: column; }
+            .right-panel { width: 100%; }
+            .duix-container { min-height: 350px; }
         }
-        sign = jwt.encode(payload, DUIX_APP_KEY, algorithm='HS256')
-        return jsonify({'success': True, 'sign': sign, 'appId': DUIX_APP_ID, 'expires_in': 1800})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <div class="duix-container">
+                <div id="duix-container"></div>
+            </div>
+            <div class="chat-area" id="chatArea">
+                <div class="chat-msg bot">您好！我是工会知识库助手，可以回答关于工会福利、关爱服务、帮扶救助、财务管理等问题。请问有什么可以帮您？</div>
+            </div>
+            <div class="input-area">
+                <input type="text" id="questionInput" placeholder="请输入您的问题..." onkeypress="if(event.key==='Enter')askQuestion()">
+                <button id="askBtn" onclick="askQuestion()">提问</button>
+            </div>
+        </div>
+        <div class="right-panel">
+            <div class="info-card">
+                <h3>系统状态</h3>
+                <p>数字人: <span id="duixStatus" class="status loading">初始化中</span></p>
+                <p style="margin-top:6px">知识库: <span id="kbStatus" class="status loading">检测中</span></p>
+            </div>
+            <div class="info-card">
+                <h3>配置信息</h3>
+                <div class="config-section">
+                    <label>知识库 API 地址</label>
+                    <input type="text" id="apiUrl" value="https://web-production-55858.up.railway.app" placeholder="如 https://your-api.onrender.com">
+                </div>
+                <div class="config-section" style="margin-top:8px">
+                    <label>DUIX appId</label>
+                    <input type="text" id="appId" value="1539357019641876480">
+                </div>
+                <div class="config-section" style="margin-top:8px">
+                    <label>DUIX appKey</label>
+                    <input type="text" id="appKey" value="7bf9f999-d214-441d-91dd-3833d0bb24be">
+                </div>
+            </div>
+            <div class="info-card">
+                <h3>知识库信息</h3>
+                <p>共 154 条知识条目，覆盖以下文件：</p>
+                <p style="margin-top:6px; font-size:12px; color:#999;">
+                    • 工会福利梳理（福利标准速查表）<br>
+                    • 职业生涯全过程关爱服务实施意见<br>
+                    • 三不让帮扶救助实施办法<br>
+                    • 工会财务管理办法
+                </p>
+            </div>
+        </div>
+    </div>
 
+    <script src="./duix.js"></script>
+    <script>
+        let duix = null;
+        let duixReady = false;
+        let kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
 
-@app.route('/api/health', methods=['GET'])
-def health():
-    return jsonify({
-        'status': 'ok',
-        'total_entries': KB['total_entries'],
-        'version': KB['version'],
-        'description': KB['description']
-    })
+        document.getElementById('appId').value = '1539357019641876480';
+        document.getElementById('appKey').value = '7bf9f999-d214-441d-91dd-3833d0bb24be';
 
+        async function checkKB() {
+            try {
+                kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+                const resp = await fetch(kbApiUrl + '/api/health');
+                const data = await resp.json();
+                document.getElementById('kbStatus').className = 'status connected';
+                document.getElementById('kbStatus').textContent = '已连接 (' + data.total_entries + '条)';
+            } catch (e) {
+                document.getElementById('kbStatus').className = 'status disconnected';
+                document.getElementById('kbStatus').textContent = '未连接';
+            }
+        }
 
-@app.route('/api/sources', methods=['GET'])
-def sources():
-    return jsonify({'success': True, 'sources': KB['source_files'], 'total_entries': KB['total_entries']})
+        async function initDUIX() {
+            const DUIX = window.Duix || window.DUIX;
+            if (!DUIX) {
+                console.warn('DUIX SDK 未加载');
+                document.getElementById('duixStatus').className = 'status disconnected';
+                document.getElementById('duixStatus').textContent = 'SDK未加载';
+                checkKB();
+                return;
+            }
 
+            duix = new DUIX();
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    print(f"工会知识库 API 启动中...")
-    print(f"知识库条目: {KB['total_entries']} 条")
-    print(f"监听端口: {port}")
-    app.run(host='0.0.0.0', port=port, debug=False)
+            // ★★★ 关键修复：在 init 之前就注册事件监听 ★★★
+            duix.on('show', function() {
+                console.log('DUIX 数字人已显示');
+                duixReady = true;
+                document.getElementById('duixStatus').className = 'status connected';
+                document.getElementById('duixStatus').textContent = '已连接';
+                // 播报欢迎语
+                duix.speak({
+                    content: '您好！我是工会知识库助手，可以回答关于工会福利、关爱服务、帮扶救助、财务管理等问题。请问有什么可以帮您？',
+                    interrupt: true
+                });
+            });
+
+            duix.on('error', function(err) {
+                console.error('DUIX error event:', err);
+            });
+
+            var conversationId = '2089675482202521601';
+
+            var initTimer = setTimeout(function() {
+                document.getElementById('duixStatus').className = 'status disconnected';
+                document.getElementById('duixStatus').textContent = '初始化超时';
+                console.error('DUIX init 超时');
+            }, 20000);
+
+            try {
+                await duix.init({
+                    appId: document.getElementById('appId').value,
+                    appKey: document.getElementById('appKey').value,
+                    containerLable: '#duix-container',
+                    platform: 'duix.com',
+                    conversationId: conversationId
+                });
+                clearTimeout(initTimer);
+                console.log('DUIX init 成功');
+
+                document.getElementById('duixStatus').className = 'status loading';
+                document.getElementById('duixStatus').textContent = '启动中...';
+
+                // ★★★ 关键修复：muted 改为 false，打开声音 ★★★
+                var startRes = await duix.start({
+                    muted: false,
+                    openAsr: false
+                });
+                console.log('DUIX start 结果:', JSON.stringify(startRes));
+
+                if (startRes && startRes.err) {
+                    console.error('start 失败:', startRes.err);
+                    document.getElementById('duixStatus').className = 'status disconnected';
+                    document.getElementById('duixStatus').textContent = '启动失败: ' + startRes.err;
+                } else {
+                    console.log('DUIX start 成功，等待数字人显示...');
+                    setTimeout(function() {
+                        if (!duixReady) {
+                            duixReady = true;
+                            document.getElementById('duixStatus').className = 'status connected';
+                            document.getElementById('duixStatus').textContent = '已连接';
+                            console.log('DUIX 标记为已连接（超时兜底）');
+                        }
+                    }, 5000);
+                }
+            } catch (err) {
+                clearTimeout(initTimer);
+                console.error('DUIX 错误:', err);
+                document.getElementById('duixStatus').className = 'status disconnected';
+                document.getElementById('duixStatus').textContent = '初始化失败';
+            }
+
+            checkKB();
+        }
+
+        async function queryKB(question) {
+            kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+            const resp = await fetch(kbApiUrl + '/api/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question: question })
+            });
+            return await resp.json();
+        }
+
+        async function askQuestion() {
+            var input = document.getElementById('questionInput');
+            var btn = document.getElementById('askBtn');
+            var question = input.value.trim();
+            if (!question) return;
+
+            addChatMsg(question, 'user');
+            input.value = '';
+            btn.disabled = true;
+            btn.textContent = '查询中...';
+
+            try {
+                var result = await queryKB(question);
+                if (result.success) {
+                    var answerText = result.answer;
+                    var sourceText = '';
+                    if (result.source) {
+                        sourceText = '📄 来源：' + result.source + ' | ' + result.chapter;
+                    }
+                    addChatMsg(answerText, 'bot', sourceText);
+                    // 让数字人播报回答
+                    if (duix && duixReady) {
+                        var speakText = answerText;
+                        if (speakText.length > 500) {
+                            speakText = speakText.substring(0, 500) + '...';
+                        }
+                        console.log('DUIX speak:', speakText.substring(0, 50));
+                        duix.speak({ content: speakText, interrupt: true });
+                    } else {
+                        console.warn('DUIX 未就绪，跳过播报。duixReady=' + duixReady);
+                    }
+                } else {
+                    addChatMsg(result.error || '查询失败', 'bot');
+                }
+            } catch (e) {
+                console.error('查询失败:', e);
+                addChatMsg('抱歉，知识库服务暂时不可用，请稍后重试。', 'bot');
+            }
+
+            btn.disabled = false;
+            btn.textContent = '提问';
+        }
+
+        function addChatMsg(text, role, source) {
+            var chatArea = document.getElementById('chatArea');
+            var msg = document.createElement('div');
+            msg.className = 'chat-msg ' + role;
+            msg.innerHTML = text;
+            if (source) {
+                msg.innerHTML += '<div class="source">' + source + '</div>';
+            }
+            chatArea.appendChild(msg);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        window.addEventListener('load', initDUIX);
+    </script>
+</body>
+</html>
