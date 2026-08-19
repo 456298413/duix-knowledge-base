@@ -88,7 +88,7 @@
         </div>
     </div>
 
-   <script src="./duix.js"></script>
+    <script src="./duix.js"></script>
     <script>
         let duix = null;
         let duixReady = false;
@@ -97,7 +97,6 @@
         document.getElementById('appId').value = '1539357019641876480';
         document.getElementById('appKey').value = '7bf9f999-d214-441d-91dd-3833d0bb24be';
 
-        // 检查知识库连接
         async function checkKB() {
             try {
                 kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
@@ -111,7 +110,6 @@
             }
         }
 
-        // 从后端获取 JWT sign
         async function fetchSign() {
             try {
                 kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
@@ -129,7 +127,6 @@
             }
         }
 
-        // 初始化 DUIX
         async function initDUIX() {
             const DUIX = window.Duix || window.DUIX;
             if (!DUIX) {
@@ -142,7 +139,6 @@
 
             duix = new DUIX();
 
-            // 监听初始化成功事件
             duix.on('initialSuccess', function() {
                 console.log('DUIX 初始化成功');
                 duix.start({
@@ -158,7 +154,6 @@
                 });
             });
 
-            // 数字人显示事件
             duix.on('show', function() {
                 console.log('DUIX 数字人已显示');
                 duixReady = true;
@@ -170,19 +165,16 @@
                 });
             });
 
-            // 进度事件
             duix.on('progress', function(p) {
                 console.log('DUIX 加载进度:', p);
             });
 
-            // 错误事件
             duix.on('error', function(err) {
                 console.error('DUIX 错误:', err);
                 document.getElementById('duixStatus').className = 'status disconnected';
                 document.getElementById('duixStatus').textContent = '连接失败';
             });
 
-            // 说话事件
             duix.on('speakStart', function(data) {
                 console.log('数字人开始说话:', data.content);
             });
@@ -190,36 +182,33 @@
                 console.log('数字人说话结束:', data.content);
             });
 
-           // 获取 sign 并初始化
-const sign = await fetchSign();
-if (!sign) {
-    document.getElementById('duixStatus').className = 'status disconnected';
-    document.getElementById('duixStatus').textContent = '鉴权失败';
-    checkKB();
-    return;
-}
+            const sign = await fetchSign();
+            if (!sign) {
+                document.getElementById('duixStatus').className = 'status disconnected';
+                document.getElementById('duixStatus').textContent = '鉴权失败';
+                checkKB();
+                return;
+            }
 
-// 生成唯一的 conversationId
-var conversationId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            var conversationId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            
+            try {
+                await duix.init({
+                    sign: sign,
+                    containerLable: '#duix-container',
+                    platform: 'duix.guiji.cn',
+                    conversationId: conversationId
+                });
+                console.log('DUIX init 调用成功, conversationId:', conversationId);
+            } catch (err) {
+                console.error('DUIX init 失败:', err);
+                document.getElementById('duixStatus').className = 'status disconnected';
+                document.getElementById('duixStatus').textContent = '初始化失败';
+            }
 
-try {
-    await duix.init({
-        sign: sign,
-        containerLable: '#duix-container',
-        platform: 'duix.guiji.cn',
-        conversationId: conversationId
-    });
-    console.log('DUIX init 调用成功, conversationId:', conversationId);
-} catch (err) {
-    console.error('DUIX init 失败:', err);
-    document.getElementById('duixStatus').className = 'status disconnected';
-    document.getElementById('duixStatus').textContent = '初始化失败';
-}
-
-checkKB();
+            checkKB();
         }
 
-        // 问答功能
         async function queryKB(question) {
             kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
             const resp = await fetch(kbApiUrl + '/api/ask', {
