@@ -94,9 +94,7 @@
         let duixReady = false;
         let kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
 
-        document.getElementById('appId').value = '1539357019641876480';
-        document.getElementById('appKey').value = '7bf9f999-d214-441d-91dd-3833d0bb24be';
-
+        // 检查知识库连接
         async function checkKB() {
             try {
                 kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
@@ -110,6 +108,7 @@
             }
         }
 
+        // 初始化 DUIX
         async function initDUIX() {
             const DUIX = window.Duix || window.DUIX;
             if (!DUIX) {
@@ -122,19 +121,9 @@
 
             duix = new DUIX();
 
+            // 事件监听
             duix.on('initialSuccess', function() {
-                console.log('DUIX 初始化成功');
-                duix.start({
-                    muted: true,
-                    openAsr: false
-                }).then(function(res) {
-                    console.log('DUIX 会话启动:', res);
-                    if (res.err) {
-                        console.error('启动失败:', res.err);
-                        document.getElementById('duixStatus').className = 'status disconnected';
-                        document.getElementById('duixStatus').textContent = '启动失败';
-                    }
-                });
+                console.log('DUIX initialSuccess 事件触发');
             });
 
             duix.on('show', function() {
@@ -165,33 +154,48 @@
                 console.log('数字人说话结束:', data.content);
             });
 
-            // 直接传入 appId 和 appKey，让 SDK 自动向 DUIX 官方获取签名
-           var conversationId = '2089675482202521601';
-            
-           // 超时保护
-var initTimer = setTimeout(function() {
-    document.getElementById('duixStatus').className = 'status disconnected';
-    document.getElementById('duixStatus').textContent = '初始化超时';
-}, 15000);
+            // 使用 DUIX Dashboard 提供的真实 conversationId
+            var conversationId = '2089675482202521601';
 
-try {
-    await duix.init({
+            // 超时保护：15秒没响应就提示
+            var initTimer = setTimeout(function() {
+                document.getElementById('duixStatus').className = 'status disconnected';
+                document.getElementById('duixStatus').textContent = '初始化超时';
+                console.error('DUIX init 超时，请检查浏览器控制台');
+            }, 15000);
+
+            try {
+                await duix.init({
                     appId: document.getElementById('appId').value,
                     appKey: document.getElementById('appKey').value,
                     containerLable: '#duix-container',
                     platform: 'duix.com',
                     conversationId: conversationId
                 });
-                console.log('DUIX init 调用成功, conversationId:', conversationId);
+                clearTimeout(initTimer);
+                // init 成功，直接更新状态并启动数字人
+                duixReady = true;
+                document.getElementById('duixStatus').className = 'status connected';
+                document.getElementById('duixStatus').textContent = '已连接';
+                console.log('DUIX init 成功, conversationId:', conversationId);
+                duix.start({ muted: true, openAsr: false }).then(function(res) {
+                    if (res.err) {
+                        console.error('start 失败:', res.err);
+                    } else {
+                        console.log('DUIX 会话启动成功');
+                    }
+                });
             } catch (err) {
+                clearTimeout(initTimer);
                 console.error('DUIX init 失败:', err);
                 document.getElementById('duixStatus').className = 'status disconnected';
-                document.getElementById('duixStatus').textContent = '初始化失败';
+                document.getElementById('duixStatus').textContent = '初始化失败: ' + (err?.message || err);
             }
 
             checkKB();
         }
 
+        // 问答功能
         async function queryKB(question) {
             kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
             const resp = await fetch(kbApiUrl + '/api/ask', {
