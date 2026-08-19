@@ -34,7 +34,7 @@ def search_knowledge_base(question, top_k=3):
         return []
     q_words = set(re.findall(r'[\u4e00-\u9fa5]{2,6}', question))
     scored = []
-    for entry in ENTIES:
+    for entry in ENTRIES:
         score = 0
         entry_text = entry['title'] + ' ' + entry['content'] + ' ' + ' '.join(entry.get('keywords', []))
         hit_count = sum(1 for w in q_words if w in entry_text)
