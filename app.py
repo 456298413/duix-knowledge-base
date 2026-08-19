@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import json
 import os
-import re
 import io
 import edge_tts
 import asyncio
@@ -10,12 +9,10 @@ import asyncio
 app = Flask(__name__)
 CORS(app)
 
-# 加载知识库
 KB_PATH = os.path.join(os.path.dirname(__file__), 'knowledge_base', 'knowledge_base.json')
 with open(KB_PATH, 'r', encoding='utf-8') as f:
     knowledge_base = json.load(f)
 
-# 可用声音
 VOICES = {
     'xiaoxiao': 'zh-CN-XiaoxiaoNeural',
     'yunxi': 'zh-CN-YunxiNeural',
@@ -27,14 +24,11 @@ def fuzzy_match(question, entry):
     q = question.lower()
     keywords = entry.get('keywords', [])
     title = entry.get('title', '').lower()
-    content = entry.get('content', '').lower()
-    
     if title in q or q in title:
         return True
     for kw in keywords:
         if kw.lower() in q:
             return True
-    
     q_words = set(q)
     t_words = set(title)
     if len(q_words & t_words) / max(len(q_words | t_words), 1) > 0.5:
@@ -54,7 +48,6 @@ def ask():
     question = request.args.get('question', '').strip()
     if not question:
         return jsonify({'success': False, 'answer': '请输入您的问题'})
-    
     result = search_knowledge(question)
     if result:
         return jsonify({
@@ -85,18 +78,15 @@ def tts():
         return jsonify({'error': 'text is required'}), 400
     if len(text) > 500:
         text = text[:500]
-    
     voice_id = VOICES.get(voice, VOICES['xiaoxiao'])
-    
     try:
         async def generate():
-            communicate = edge_tts.Communicate(text, voice_id, rate='-5%')
+            communicate = edge_tts.Communicate(text, voice_id)
             audio_data = bytearray()
             async for chunk in communicate.stream():
                 if chunk['type'] == 'audio':
                     audio_data.extend(chunk['data'])
             return bytes(audio_data)
-        
         audio_bytes = asyncio.run(generate())
         buf = io.BytesIO(audio_bytes)
         buf.seek(0)
