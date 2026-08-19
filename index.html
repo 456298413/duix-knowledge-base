@@ -130,6 +130,7 @@
 
             duix = new DUIX();
 
+            // 事件监听必须在 init 之前注册
             duix.on('show', function() {
                 console.log('DUIX 数字人已显示');
                 duixReady = true;
@@ -154,8 +155,10 @@
             }, 20000);
 
             try {
+                // 从后端获取 JWT sign
                 document.getElementById('duixStatus').textContent = '获取签名...';
                 var sign = await fetchSign();
+                console.log('sign:', sign);
 
                 await duix.init({
                     sign: sign,
@@ -169,6 +172,7 @@
                 document.getElementById('duixStatus').className = 'status loading';
                 document.getElementById('duixStatus').textContent = '启动中...';
 
+                // 等待 initialSuccess 事件后调用 start
                 var startDone = false;
                 function tryStart() {
                     if (startDone) return;
@@ -190,13 +194,14 @@
                 }
 
                 duix.on('initialSuccess', function() {
-                    console.log('收到 initialSuccess，调用 start');
+                    console.log('收到 initialSuccess');
                     tryStart();
                 });
 
+                // 兜底：5秒后如果 initialSuccess 没触发，直接调 start
                 setTimeout(function() {
                     if (!startDone) {
-                        console.warn('initialSuccess 未触发，直接调用 start');
+                        console.warn('initialSuccess 超时，直接调用 start');
                         tryStart();
                     }
                 }, 5000);
