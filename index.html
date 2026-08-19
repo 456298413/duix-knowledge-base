@@ -92,12 +92,11 @@
     <script>
         let duix = null;
         let duixReady = false;
-        let kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
 
         // 检查知识库连接
         async function checkKB() {
             try {
-                kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+                var kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
                 const resp = await fetch(kbApiUrl + '/api/health');
                 const data = await resp.json();
                 document.getElementById('kbStatus').className = 'status connected';
@@ -131,10 +130,6 @@
                 duixReady = true;
                 document.getElementById('duixStatus').className = 'status connected';
                 document.getElementById('duixStatus').textContent = '已连接';
-                duix.speak({
-                    content: '您好！我是工会知识库助手，可以回答关于工会福利、关爱服务、帮扶救助、财务管理等问题。请问有什么可以帮您？',
-                    interrupt: true
-                });
             });
 
             duix.on('progress', function(p) {
@@ -157,15 +152,15 @@
             // 使用 DUIX Dashboard 提供的真实 conversationId
             var conversationId = '2089675482202521601';
 
-            // 超时保护：15秒没响应就提示
+            // 超时保护：20秒没响应就提示
             var initTimer = setTimeout(function() {
                 document.getElementById('duixStatus').className = 'status disconnected';
                 document.getElementById('duixStatus').textContent = '初始化超时';
-                console.error('DUIX init 超时，请检查浏览器控制台');
-            }, 15000);
+                console.error('DUIX init 超时');
+            }, 20000);
 
             try {
-                await duix.init({
+                var initResult = await duix.init({
                     appId: document.getElementById('appId').value,
                     appKey: document.getElementById('appKey').value,
                     containerLable: '#duix-container',
@@ -173,23 +168,36 @@
                     conversationId: conversationId
                 });
                 clearTimeout(initTimer);
-                // init 成功，直接更新状态并启动数字人
+                console.log('DUIX init 返回:', JSON.stringify(initResult));
+
+                // init 成功后启动数字人
                 duixReady = true;
                 document.getElementById('duixStatus').className = 'status connected';
                 document.getElementById('duixStatus').textContent = '已连接';
-                console.log('DUIX init 成功, conversationId:', conversationId);
-                duix.start({ muted: true, openAsr: false }).then(function(res) {
-                    if (res.err) {
-                        console.error('start 失败:', res.err);
-                    } else {
-                        console.log('DUIX 会话启动成功');
-                    }
+
+                var startResult = await duix.start({
+                    muted: false,
+                    openAsr: false,
+                    openTts: true,
+                    video: true
                 });
+                console.log('DUIX start 返回:', JSON.stringify(startResult));
+
+                // 数字人问好后开始欢迎语
+                setTimeout(function() {
+                    if (duixReady && duix) {
+                        duix.speak({
+                            content: '您好！我是工会知识库助手，可以回答关于工会福利、关爱服务、帮扶救助、财务管理等问题。请问有什么可以帮您？',
+                            interrupt: true
+                        });
+                    }
+                }, 2000);
+
             } catch (err) {
                 clearTimeout(initTimer);
                 console.error('DUIX init 失败:', err);
                 document.getElementById('duixStatus').className = 'status disconnected';
-                document.getElementById('duixStatus').textContent = '初始化失败: ' + (err?.message || err);
+                document.getElementById('duixStatus').textContent = '初始化失败: ' + (err?.message || JSON.stringify(err));
             }
 
             checkKB();
@@ -197,7 +205,7 @@
 
         // 问答功能
         async function queryKB(question) {
-            kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+            var kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
             const resp = await fetch(kbApiUrl + '/api/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
