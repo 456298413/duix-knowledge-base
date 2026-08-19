@@ -30,6 +30,9 @@ BLACKLIST = [
     '解释权归公司工会', '以上标准如有变动', '本办法自2025年1月1日起施行',
 ]
 
+# 文件头条目 ID（内容只有文件头文本，不应作为搜索结果返回）
+FILE_HEADER_IDS = {'career-00', 'sbr-00', 'finance-00'}
+
 # ============================================================
 # 来源文件识别
 # ============================================================
@@ -63,6 +66,103 @@ def detect_source(question):
         for kw in config['keywords']:
             if kw in question:
                 return source_name
+    return None
+
+
+# ============================================================
+# 快捷按钮处理：点击按钮时直接返回章节菜单
+# ============================================================
+QUICK_BUTTON_QUERIES = {
+    'career': ['职业生涯关爱', '职业生涯全过程', '全过程关爱服务'],
+    'sbr': ['三不让帮扶救助', '三不让帮扶', '三不让办法', '三不让'],
+    'finance': ['财务管理办法', '工会财务管理', '经费管理办法'],
+    'welfare': ['工会福利', '福利梳理', '福利手册', '福利办法'],
+}
+
+QUICK_MENUS = {
+    'career': {
+        'answer': '「职业生涯全过程关爱服务」包含以下章节，请问您想了解哪一章？',
+        'items': [
+            {'label': '一、指导思想', 'key': 'career-01'},
+            {'label': '二、工作原则', 'key': 'career-02'},
+            {'label': '三、目的意义', 'key': 'career-03'},
+            {'label': '四、主要任务（十大关爱服务）', 'key': 'career-04'},
+            {'label': '五、具体要求', 'key': 'career-05'},
+        ],
+        'source': '中铁二局职工职业生涯全过程关爱服务实施意见',
+    },
+    'sbr': {
+        'answer': '「三不让帮扶救助实施办法」包含以下章节，请问您想了解哪一章？',
+        'items': [
+            {'label': '第一章 总则', 'key': 'sbr-01'},
+            {'label': '第二章 组织领导及要求', 'key': 'sbr-02'},
+            {'label': '第三章 专项资金来源及管理', 'key': 'sbr-03'},
+            {'label': '第四章 困难职工分类', 'key': 'sbr-04'},
+            {'label': '第五章 困难补助', 'key': 'sbr-05'},
+            {'label': '第六章 帮困助学', 'key': 'sbr-06'},
+            {'label': '第七章 医疗救助', 'key': 'sbr-07'},
+            {'label': '第八章 工作制度', 'key': 'sbr-08'},
+            {'label': '第九章 附则', 'key': 'sbr-09'},
+        ],
+        'source': '三不让帮扶救助实施办法',
+    },
+    'finance': {
+        'answer': '「工会财务管理办法」包含以下章节，请问您想了解哪一章？',
+        'items': [
+            {'label': '第一章 总则', 'key': 'finance-01'},
+            {'label': '第二章 财务管理体制', 'key': 'finance-02'},
+            {'label': '第三章 预算管理', 'key': 'finance-03'},
+            {'label': '第四章 经费收入管理', 'key': 'finance-04'},
+            {'label': '第五章 经费支出管理', 'key': 'finance-05'},
+            {'label': '第六章 资金管理', 'key': 'finance-06'},
+            {'label': '第七章 资产管理', 'key': 'finance-07'},
+            {'label': '第八章 会计管理', 'key': 'finance-08'},
+            {'label': '第九章 财务监督', 'key': 'finance-09'},
+            {'label': '第十章 财务报表和财务分析', 'key': 'finance-10'},
+            {'label': '第十一章 附则', 'key': 'finance-11'},
+        ],
+        'source': '中铁二局集团有限公司工会财务管理办法',
+    },
+    'welfare': {
+        'answer': '「工会职业生涯全过程福利手册」包含以下内容，请问您想了解哪一项？',
+        'items': [
+            {'label': '一、入职入会', 'key': 'welfare-01'},
+            {'label': '二、恋爱交友', 'key': 'welfare-02'},
+            {'label': '三、结婚成家', 'key': 'welfare-03'},
+            {'label': '四、生育哺乳', 'key': 'welfare-04'},
+            {'label': '五、子女入学', 'key': 'welfare-05'},
+            {'label': '六、职工生日', 'key': 'welfare-06'},
+            {'label': '七、生病住院', 'key': 'welfare-07'},
+            {'label': '八、困难帮扶', 'key': 'welfare-08'},
+            {'label': '九、亲人去世', 'key': 'welfare-09'},
+            {'label': '十、退休离岗', 'key': 'welfare-10'},
+            {'label': '十一、年节慰问', 'key': 'welfare-11'},
+        ],
+        'source': '西安公司工会职业生涯全过程福利手册',
+    },
+}
+
+
+def handle_quick_query(question):
+    """处理快捷按钮查询，直接返回章节菜单"""
+    for cat, queries in QUICK_BUTTON_QUERIES.items():
+        for q in queries:
+            if q in question:
+                menu = QUICK_MENUS[cat]
+                return {
+                    'type': 'clarify',
+                    'answer': menu['answer'],
+                    'menu_items': menu['items'],
+                    'source': menu['source'],
+                }
+    return None
+
+
+def find_entry_by_id(entry_id):
+    """根据条目ID直接查找"""
+    for entry in ENTRIES:
+        if entry['id'] == entry_id:
+            return entry
     return None
 
 
@@ -144,52 +244,59 @@ TOPIC_CATEGORIES = {
 CLARIFY_MENUS = {
     'welfare': {
         'items': [
-            {'label': '入职入会', 'key': '入职入会'},
-            {'label': '恋爱交友', 'key': '恋爱交友'},
-            {'label': '结婚成家', 'key': '结婚成家'},
-            {'label': '生育哺乳', 'key': '生育哺乳'},
-            {'label': '子女入学', 'key': '子女入学'},
-            {'label': '职工生日', 'key': '职工生日'},
-            {'label': '生病住院', 'key': '生病住院'},
-            {'label': '困难帮扶', 'key': '困难帮扶'},
-            {'label': '亲人去世', 'key': '亲人去世'},
-            {'label': '退休离岗', 'key': '退休离岗'},
-            {'label': '年节慰问', 'key': '年节慰问'},
+            {'label': '一、入职入会', 'key': 'welfare-01'},
+            {'label': '二、恋爱交友', 'key': 'welfare-02'},
+            {'label': '三、结婚成家', 'key': 'welfare-03'},
+            {'label': '四、生育哺乳', 'key': 'welfare-04'},
+            {'label': '五、子女入学', 'key': 'welfare-05'},
+            {'label': '六、职工生日', 'key': 'welfare-06'},
+            {'label': '七、生病住院', 'key': 'welfare-07'},
+            {'label': '八、困难帮扶', 'key': 'welfare-08'},
+            {'label': '九、亲人去世', 'key': 'welfare-09'},
+            {'label': '十、退休离岗', 'key': 'welfare-10'},
+            {'label': '十一、年节慰问', 'key': 'welfare-11'},
         ],
         'source': '西安公司工会职业生涯全过程福利手册',
     },
     'career': {
         'items': [
-            {'label': '入职入会', 'key': '入职入会'},
-            {'label': '恋爱交友', 'key': '恋爱交友'},
-            {'label': '结婚成家', 'key': '结婚成家'},
-            {'label': '生育哺乳', 'key': '生育哺乳'},
-            {'label': '子女入学', 'key': '子女入学'},
-            {'label': '职工生日', 'key': '职工生日'},
-            {'label': '生病住院', 'key': '生病住院'},
-            {'label': '困难帮扶', 'key': '困难帮扶'},
-            {'label': '亲人去世', 'key': '亲人去世'},
-            {'label': '退休离岗', 'key': '退休离岗'},
+            {'label': '一、指导思想', 'key': '指导思想'},
+            {'label': '二、工作原则', 'key': '工作原则'},
+            {'label': '三、目的意义', 'key': '目的意义'},
+            {'label': '四、主要任务', 'key': '主要任务'},
+            {'label': '五、具体要求', 'key': '具体要求'},
         ],
         'source': '中铁二局职工职业生涯全过程关爱服务实施意见',
     },
     'sbr': {
         'items': [
-            {'label': '三不让总体介绍', 'key': '三不让总体'},
-            {'label': '困难补助', 'key': '困难补助'},
-            {'label': '帮困助学', 'key': '帮困助学'},
-            {'label': '医疗救助', 'key': '医疗救助'},
+            {'label': '第一章 总则', 'key': '第一章 总则'},
+            {'label': '第二章 组织领导及要求', 'key': '第二章 组织领导'},
+            {'label': '第三章 专项资金来源及管理', 'key': '第三章 专项资金'},
+            {'label': '第四章 困难职工分类', 'key': '第四章 困难职工分类'},
+            {'label': '第五章 困难补助', 'key': '第五章 困难补助'},
+            {'label': '第六章 帮困助学', 'key': '第六章 帮困助学'},
+            {'label': '第七章 医疗救助', 'key': '第七章 医疗救助'},
+            {'label': '第八章 工作制度', 'key': '第八章 工作制度'},
+            {'label': '第九章 附则', 'key': '第九章 附则'},
         ],
         'source': '三不让帮扶救助实施办法',
     },
     'finance': {
         'items': [
-            {'label': '预算管理', 'key': '预算'},
-            {'label': '经费收入管理', 'key': '经费收入'},
-            {'label': '经费支出管理', 'key': '经费支出'},
-            {'label': '资产与负债管理', 'key': '资产'},
+            {'label': '第一章 总则', 'key': '第一章 总则'},
+            {'label': '第二章 财务管理体制', 'key': '第二章 财务管理体制'},
+            {'label': '第三章 预算管理', 'key': '第三章 预算管理'},
+            {'label': '第四章 经费收入管理', 'key': '第四章 经费收入'},
+            {'label': '第五章 经费支出管理', 'key': '第五章 经费支出'},
+            {'label': '第六章 资金管理', 'key': '第六章 资金管理'},
+            {'label': '第七章 资产管理', 'key': '第七章 资产管理'},
+            {'label': '第八章 会计管理', 'key': '第八章 会计管理'},
+            {'label': '第九章 财务监督', 'key': '第九章 财务监督'},
+            {'label': '第十章 财务报表和财务分析', 'key': '第十章 财务报表'},
+            {'label': '第十一章 附则', 'key': '第十一章 附则'},
         ],
-        'source': '工会财务管理办法',
+        'source': '中铁二局集团有限公司工会财务管理办法',
     },
 }
 
@@ -253,6 +360,9 @@ def find_best_entry(question, filter_fn=None, max_results=1):
     for entry in ENTRIES:
         if filter_fn and not filter_fn(entry):
             continue
+        # 过滤文件头条目
+        if entry.get('id', '') in FILE_HEADER_IDS:
+            continue
         if any(b in entry.get('content', '') for b in BLACKLIST):
             continue
         if len(entry.get('content', '').strip()) < 20:
@@ -270,13 +380,22 @@ def find_best_entry(question, filter_fn=None, max_results=1):
 
 
 def find_entry_by_subtopic(sub_key):
-    """按子主题关键词查找具体条目"""
-    # 先检查是否是澄清菜单里的key
+    """按子主题关键词查找具体条目（优先用ID精确匹配）"""
+    # 1. 如果 sub_key 是条目 ID，直接查找
+    entry = find_entry_by_id(sub_key)
+    if entry and len(entry.get('content', '')) > 50:
+        return entry
+
+    # 2. 检查是否是澄清菜单里的key（可能是条目ID）
     for cat, menu in CLARIFY_MENUS.items():
         for item in menu['items']:
             if item['key'] == sub_key:
+                # 如果 key 是条目 ID
+                entry = find_entry_by_id(item['key'])
+                if entry and len(entry.get('content', '')) > 50:
+                    return entry
+                # 否则按 label 标题匹配
                 label = item['label']
-                # 标题包含匹配（更宽松）
                 for entry in ENTRIES:
                     title = entry.get('title', '')
                     if label in title and len(entry.get('content', '')) > 50:
@@ -292,7 +411,7 @@ def find_entry_by_subtopic(sub_key):
                     if label in entry.get('content', '') and len(entry.get('content', '')) > 50:
                         return entry
 
-    # 通用子主题搜索：在标题中搜索
+    # 3. 通用子主题搜索：在标题中搜索
     for entry in ENTRIES:
         if sub_key in entry.get('title', '') and len(entry.get('content', '')) > 30:
             return entry
@@ -450,16 +569,46 @@ def ask():
         return jsonify({'success': False, 'answer': '请输入您的问题'}), 400
 
     try:
-        # 0. 检测是否指定了来源文件
+        # 0. 快捷按钮处理：优先返回章节菜单
+        quick_result = handle_quick_query(question)
+        if quick_result:
+            return jsonify({
+                'success': True,
+                'type': quick_result['type'],
+                'answer': quick_result['answer'],
+                'menu_items': quick_result['menu_items'],
+                'source': quick_result.get('source', ''),
+            })
+
+        # 0.5 检测是否指定了来源文件
         source_filter = detect_source(question)
+
+        # 0.6 检测是否为菜单选择（前端发送 __ENTRY__:id:label 格式）
+        if question.startswith('__ENTRY__:'):
+            parts = question.split(':', 2)
+            if len(parts) >= 2:
+                entry_id = parts[1]
+                entry = find_entry_by_id(entry_id)
+                if entry and len(entry.get('content', '')) > 50:
+                    result = format_entry_answer(entry)
+                    return jsonify({
+                        'success': True,
+                        'type': 'detail',
+                        'answer': result['answer'],
+                        'source': result['source'],
+                    })
+            # 解析失败，去掉前缀继续正常流程
+            question = parts[2] if len(parts) > 2 else question
 
         # 如果指定了来源文件，优先在指定文件中精确搜索
         if source_filter:
+            # 先尝试在指定文件中找具体条目
             marker = SOURCE_FILE_MAP[source_filter]['marker']
             filter_fn = lambda e: marker in e.get('source_file', '') or marker in e.get('source_title', '')
             results = find_best_entry(question, filter_fn=filter_fn, max_results=1)
 
             if results and results[0][0] >= 15:
+                # 找到高匹配度条目，直接返回
                 result = format_entry_answer(results[0][1])
                 return jsonify({
                     'success': True,
@@ -468,6 +617,7 @@ def ask():
                     'source': result['source'],
                 })
 
+            # 高匹配度没找到，尝试主题分类（在指定来源内）
             topics = detect_topics(question)
             if topics:
                 clarify = try_clarify(question, topics, source_filter=source_filter)
@@ -489,6 +639,7 @@ def ask():
                             'source': result['source'],
                         })
 
+            # 兜底：来源限定搜索
             src_result = source_filtered_search(question, source_filter)
             if src_result:
                 return jsonify({
