@@ -96,22 +96,22 @@
     transform: scale(1);
   }
 
-  /* 左侧气泡：红框范围内 */
+  /* 左侧气泡：单侧，不遮住人物 */
   .bubble-left {
-    left: 4%;
-    top: 12%;
-    width: 18%;
-    max-width: 18%;
-    bottom: 30%;
+    left: 1.5%;
+    top: 14%;
+    width: 14%;
+    max-width: 14%;
+    bottom: 45%;
   }
 
-  /* 右侧气泡：红框范围内 */
+  /* 右侧气泡：单侧，不遮住人物 */
   .bubble-right {
-    left: 78%;
-    top: 12%;
-    width: 18%;
-    max-width: 18%;
-    bottom: 30%;
+    right: 1.5%;
+    top: 14%;
+    width: 14%;
+    max-width: 14%;
+    bottom: 45%;
   }
 
   .bubble::-webkit-scrollbar { width: 3px; }
@@ -348,9 +348,9 @@
     .container { flex-direction: column; }
     .left-panel { flex: 0 0 45vh; }
     .right-panel { flex: 1; }
-    .bubble { max-width: 22%; font-size: 0.8rem; padding: 10px 14px; }
-    .bubble-left { left: 2%; top: 10%; width: 20%; bottom: 35%; }
-    .bubble-right { left: 76%; top: 10%; width: 20%; bottom: 35%; }
+    .bubble { max-width: 16%; font-size: 0.8rem; padding: 10px 14px; }
+    .bubble-left { left: 1%; top: 12%; width: 16%; bottom: 48%; }
+    .bubble-right { right: 1%; top: 12%; width: 16%; bottom: 48%; }
   }
 </style>
 </head>
@@ -467,7 +467,7 @@ function hideBubbles() {
   roundDots.innerHTML = '';
 }
 
-// ===== TTS 语音播报 + 双气泡 + 多轮 =====
+// ===== TTS 语音播报 + 单侧气泡 + 多轮 =====
 function speakAndShow(text) {
   window.speechSynthesis.cancel();
   hideBubbles();
@@ -476,13 +476,12 @@ function speakAndShow(text) {
   if (!text || !window.speechSynthesis) return;
 
   const MAX_PER_SIDE = 180;
-  const MAX_PER_ROUND = MAX_PER_SIDE * 2;
 
   const paragraphs = text.split('\n').filter(p => p.trim());
   const rounds = [];
   let buf = '';
   for (const para of paragraphs) {
-    if (buf && (buf.length + para.length + 1) > MAX_PER_ROUND) {
+    if (buf && (buf.length + para.length + 1) > MAX_PER_SIDE) {
       rounds.push(buf.trim());
       buf = para;
     } else {
@@ -511,14 +510,18 @@ function speakAndShow(text) {
     }
 
     const rText = rounds[roundIdx];
-    const mid = Math.ceil(rText.length / 2);
-    const leftText = rText.substring(0, mid);
-    const rightText = rText.substring(mid);
 
-    bubbleLeft.textContent = leftText;
-    bubbleRight.textContent = rightText.trim() ? rightText : '';
-    bubbleLeft.classList.add('visible');
-    if (rightText.trim()) bubbleRight.classList.add('visible');
+    // 单侧显示，交替左右
+    const side = roundIdx % 2 === 0 ? 'left' : 'right';
+    hideBubbles();
+
+    if (side === 'left') {
+      bubbleLeft.textContent = rText;
+      bubbleLeft.classList.add('visible');
+    } else {
+      bubbleRight.textContent = rText;
+      bubbleRight.classList.add('visible');
+    }
 
     const dots = roundDots.querySelectorAll('.round-dot');
     dots.forEach((d, i) => d.classList.toggle('active', i === roundIdx));
@@ -605,10 +608,9 @@ async function sendMsg() {
       if (data.type === 'detail') {
         speakAndShow(data.answer);
       } else {
-        bubbleLeft.textContent = data.answer.substring(0, Math.ceil(data.answer.length / 2));
-        bubbleRight.textContent = data.answer.substring(Math.ceil(data.answer.length / 2));
+        bubbleLeft.textContent = data.answer;
+        bubbleRight.textContent = '';
         bubbleLeft.classList.add('visible');
-        bubbleRight.classList.add('visible');
       }
     } else {
       addChatMsg('抱歉，未找到相关信息。', 'bot');
