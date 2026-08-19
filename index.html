@@ -110,6 +110,26 @@
             }
         }
 
+        function tryStart(retryCount) {
+            return new Promise(function(resolve) {
+                duix.start({ muted: true, openAsr: false }).then(function(res) {
+                    console.log('DUIX start 结果 (第' + (retryCount + 1) + '次):', JSON.stringify(res));
+                    if (res && res.err) {
+                        if (retryCount < 3) {
+                            console.log('启动失败，' + (2000 * (retryCount + 1)) + 'ms 后重试...');
+                            setTimeout(function() { tryStart(retryCount + 1).then(resolve); }, 2000 * (retryCount + 1));
+                        } else {
+                            console.error('重试3次后仍失败:', res.err);
+                            resolve({ success: false, err: res.err });
+                        }
+                    } else {
+                        console.log('DUIX start 成功！');
+                        resolve({ success: true });
+                    }
+                });
+            });
+        }
+
         async function initDUIX() {
             const DUIX = window.Duix || window.DUIX;
             if (!DUIX) {
@@ -143,18 +163,18 @@
                 document.getElementById('duixStatus').className = 'status loading';
                 document.getElementById('duixStatus').textContent = '启动中...';
 
-                var startRes = await duix.start({ muted: true, openAsr: false });
-                console.log('DUIX start 结果:', JSON.stringify(startRes));
+                // 等3秒让 MQTT 连接稳定后再 start
+                console.log('等待 MQTT 稳定...');
+                await new Promise(function(r) { setTimeout(r, 3000); });
 
-                if (startRes && startRes.err) {
-                    console.error('start 失败:', startRes.err);
-                    document.getElementById('duixStatus').className = 'status disconnected';
-                    document.getElementById('duixStatus').textContent = '启动失败: ' + startRes.err;
-                } else {
-                    console.log('DUIX start 成功');
+                var result = await tryStart(0);
+                if (result.success) {
                     duixReady = true;
                     document.getElementById('duixStatus').className = 'status connected';
                     document.getElementById('duixStatus').textContent = '已连接';
+                } else {
+                    document.getElementById('duixStatus').className = 'status disconnected';
+                    document.getElementById('duixStatus').textContent = '启动失败: ' + result.err;
                 }
             } catch (err) {
                 clearTimeout(initTimer);
