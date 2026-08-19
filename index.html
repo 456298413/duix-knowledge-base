@@ -110,23 +110,6 @@
             }
         }
 
-        async function fetchSign() {
-            try {
-                kbApiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
-                const resp = await fetch(kbApiUrl + '/api/sign');
-                const data = await resp.json();
-                if (data.success) {
-                    return data.sign;
-                } else {
-                    console.error('获取 sign 失败:', data.error);
-                    return null;
-                }
-            } catch (e) {
-                console.error('请求 sign 接口失败:', e);
-                return null;
-            }
-        }
-
         async function initDUIX() {
             const DUIX = window.Duix || window.DUIX;
             if (!DUIX) {
@@ -182,19 +165,13 @@
                 console.log('数字人说话结束:', data.content);
             });
 
-            const sign = await fetchSign();
-            if (!sign) {
-                document.getElementById('duixStatus').className = 'status disconnected';
-                document.getElementById('duixStatus').textContent = '鉴权失败';
-                checkKB();
-                return;
-            }
-
+            // 直接传入 appId 和 appKey，让 SDK 自动向 DUIX 官方获取签名
             var conversationId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
             
             try {
                 await duix.init({
-                    sign: sign,
+                    appId: document.getElementById('appId').value,
+                    appKey: document.getElementById('appKey').value,
                     containerLable: '#duix-container',
                     platform: 'duix.guiji.cn',
                     conversationId: conversationId
