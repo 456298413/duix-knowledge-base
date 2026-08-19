@@ -155,10 +155,13 @@ def ask():
 def get_sign():
     """生成 DUIX H5 SDK 所需的 JWT 签名"""
     try:
+              # JWT 签名：有效期 30 分钟
+        # 注意：载荷字段名必须是 robotCode（不是 appId），签发时间减10秒防止时钟不同步
         payload = {
-            'appId': DUIX_APP_ID,
-            'iat': int(time.time()),
-            'exp': int(time.time()) + 1800
+            'robotCode': DUIX_APP_ID,
+            'iat': int(time.time()) - 10,
+            'exp': int(time.time()) + 1800  # 30 分钟过期
+        }
         }
         sign = jwt.encode(payload, DUIX_APP_KEY, algorithm='HS256')
         return jsonify({
