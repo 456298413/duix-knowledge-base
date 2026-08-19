@@ -10,28 +10,20 @@
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; display: flex; gap: 20px; min-height: 100vh; }
         .left-panel { flex: 1; background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; display: flex; flex-direction: column; }
         .right-panel { width: 400px; display: flex; flex-direction: column; gap: 16px; }
-        
-        /* 数字人区域 */
         .duix-container { flex: 1; min-height: 500px; background: #000; border-radius: 12px 12px 0 0; position: relative; }
         #duix-container { width: 100%; height: 100%; }
-        
-        /* 对话区域 */
         .chat-area { padding: 16px; flex: 1; overflow-y: auto; max-height: 300px; }
         .chat-msg { margin-bottom: 12px; padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.6; }
         .chat-msg.user { background: #4f8cff; color: #fff; margin-left: 60px; border-bottom-right-radius: 4px; }
         .chat-msg.bot { background: #f0f2f5; color: #333; margin-right: 60px; border-bottom-left-radius: 4px; }
         .chat-msg .source { font-size: 12px; color: #888; margin-top: 6px; }
         .chat-msg.bot .source { color: #666; }
-        
-        /* 输入区域 */
         .input-area { padding: 16px; border-top: 1px solid #eee; display: flex; gap: 10px; }
         .input-area input { flex: 1; padding: 10px 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
         .input-area input:focus { border-color: #4f8cff; }
         .input-area button { padding: 10px 24px; background: #4f8cff; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
         .input-area button:hover { background: #3d7ae8; }
         .input-area button:disabled { background: #ccc; cursor: not-allowed; }
-        
-        /* 信息面板 */
         .info-card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
         .info-card h3 { font-size: 15px; margin-bottom: 10px; color: #333; }
         .info-card p { font-size: 13px; color: #666; line-height: 1.6; }
@@ -39,11 +31,9 @@
         .status.connected { background: #e6f7ee; color: #52c41a; }
         .status.disconnected { background: #fff2f0; color: #ff4d4f; }
         .status.loading { background: #fff7e6; color: #fa8c16; }
-        
         .config-section { margin-top: 12px; }
         .config-section label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
         .config-section input { width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
-        
         @media (max-width: 768px) {
             .container { flex-direction: column; }
             .right-panel { width: 100%; }
@@ -53,7 +43,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- 左侧：数字人 + 对话 -->
         <div class="left-panel">
             <div class="duix-container">
                 <div id="duix-container"></div>
@@ -66,15 +55,12 @@
                 <button id="askBtn" onclick="askQuestion()">提问</button>
             </div>
         </div>
-        
-        <!-- 右侧：配置和状态 -->
         <div class="right-panel">
             <div class="info-card">
                 <h3>系统状态</h3>
                 <p>数字人: <span id="duixStatus" class="status loading">初始化中</span></p>
                 <p style="margin-top:6px">知识库: <span id="kbStatus" class="status loading">检测中</span></p>
             </div>
-            
             <div class="info-card">
                 <h3>配置信息</h3>
                 <div class="config-section">
@@ -90,7 +76,6 @@
                     <input type="text" id="appKey" value="">
                 </div>
             </div>
-            
             <div class="info-card">
                 <h3>知识库信息</h3>
                 <p>共 154 条知识条目，覆盖以下文件：</p>
@@ -103,76 +88,56 @@
             </div>
         </div>
     </div>
-
-    <!-- DUIX SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/duix-guiji@latest/dist/index.umd.js"></script>
-    
+    <script src="https://cdn.guiji.cn/duix/sdk/0.0.1/duix.js"></script>
     <script>
-        // ============ 配置区域 ============
-        // 在此处填入你的 DUIX appId 和 appKey
         const DUIX_CONFIG = {
             appId: '1539357019641876480',
             appKey: '7bf9f999-d214-441d-91dd-3833d0bb24be'
         };
-        
-        // 知识库 API 地址（部署后修改为实际地址）
-       let KB_API_URL = 'https://web-production-55858.up.railway.app';
-        
-        // ============ DUIX 初始化 ============
+        let KB_API_URL = 'https://web-production-55858.up.railway.app';
         let duix = null;
         let duixReady = false;
-        
-        // 页面显示配置
         document.getElementById('appId').value = DUIX_CONFIG.appId;
         document.getElementById('appKey').value = DUIX_CONFIG.appKey;
-        
         async function initDUIX() {
             try {
-                // 动态导入 DUIX SDK（根据实际 SDK 版本调整）
-                const DUIX = window.DUIX || window.duix_guiji;
-                
+                const DUIX = window.DUIX;
                 if (!DUIX) {
-                    console.warn('DUIX SDK 未加载，进入纯文本问答模式');
                     document.getElementById('duixStatus').className = 'status disconnected';
-                    document.getElementById('duixStatus').textContent = '未连接';
+                    document.getElementById('duixStatus').textContent = 'SDK未加载';
                     checkKB();
                     return;
                 }
-                
                 duix = new DUIX({
-                    appId: DUIX_CONFIG.appId,
-                    appKey: DUIX_CONFIG.appKey,
-                    container: document.getElementById('duix-container')
+                    container: document.getElementById('duix-container'),
+                    robot: {
+                        code: DUIX_CONFIG.appId,
+                        token: DUIX_CONFIG.appKey
+                    }
                 });
-                
-                // 初始化
-                await duix.init();
-                
-                duix.on('ready', () => {
+                duix.on('bodyload', () => {
                     duixReady = true;
                     document.getElementById('duixStatus').className = 'status connected';
                     document.getElementById('duixStatus').textContent = '已连接';
-                    duix.start({
-                        openAsr: false  // 关闭语音识别，使用文本输入
-                    });
+                    duix.say('您好！我是工会知识库助手，可以回答关于工会福利、关爱服务、帮扶救助、财务管理等问题。请问有什么可以帮您？');
                 });
-                
+                duix.on('canplaythrough', () => {
+                    duix.play();
+                });
                 duix.on('error', (err) => {
-                    console.error('DUIX 错误:', err);
                     document.getElementById('duixStatus').className = 'status disconnected';
                     document.getElementById('duixStatus').textContent = '连接失败';
                 });
-                
+                duix.init({
+                    sign: DUIX_CONFIG.appKey,
+                    containerLable: '#duix-container'
+                });
             } catch (e) {
-                console.warn('DUIX 初始化失败:', e);
                 document.getElementById('duixStatus').className = 'status disconnected';
                 document.getElementById('duixStatus').textContent = '未加载SDK';
             }
-            
             checkKB();
         }
-        
-        // ============ 知识库 API ============
         async function checkKB() {
             try {
                 KB_API_URL = document.getElementById('apiUrl').value.replace(/\/$/, '');
@@ -185,7 +150,6 @@
                 document.getElementById('kbStatus').textContent = '未连接';
             }
         }
-        
         async function queryKB(question) {
             KB_API_URL = document.getElementById('apiUrl').value.replace(/\/$/, '');
             const resp = await fetch(`${KB_API_URL}/api/ask`, {
@@ -195,57 +159,40 @@
             });
             return await resp.json();
         }
-        
-        // ============ 问答交互 ============
         async function askQuestion() {
             const input = document.getElementById('questionInput');
             const btn = document.getElementById('askBtn');
             const question = input.value.trim();
-            
             if (!question) return;
-            
-            // 显示用户问题
             addChatMsg(question, 'user');
             input.value = '';
             btn.disabled = true;
             btn.textContent = '查询中...';
-            
             try {
                 const result = await queryKB(question);
-                
                 if (result.success) {
                     let answerText = result.answer;
                     let sourceText = '';
-                    
                     if (result.source) {
                         sourceText = `📄 来源：${result.source} | ${result.chapter}`;
                     }
-                    
-                    // 显示答案
                     addChatMsg(answerText, 'bot', sourceText);
-                    
-                    // 让数字人播报
                     if (duixReady && duix) {
-                        // 精简播报内容（去掉太长内容）
                         let speakText = answerText;
                         if (speakText.length > 500) {
                             speakText = speakText.substring(0, 500) + '...';
                         }
-                        duix.speak({ content: speakText });
+                        duix.speak({ content: speakText, interrupt: true });
                     }
                 } else {
                     addChatMsg(result.error || '查询失败', 'bot');
                 }
-                
             } catch (e) {
-                console.error('查询失败:', e);
                 addChatMsg('抱歉，知识库服务暂时不可用，请稍后重试。', 'bot');
             }
-            
             btn.disabled = false;
             btn.textContent = '提问';
         }
-        
         function addChatMsg(text, role, source) {
             const chatArea = document.getElementById('chatArea');
             const msg = document.createElement('div');
@@ -257,8 +204,6 @@
             chatArea.appendChild(msg);
             chatArea.scrollTop = chatArea.scrollHeight;
         }
-        
-        // 启动
         window.addEventListener('load', initDUIX);
     </script>
 </body>
