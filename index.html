@@ -483,16 +483,36 @@ btnVoice.addEventListener('click', () => {
 });
 
 // ===== 暂停播报按钮 =====
-btnStop.addEventListener('click', () => {
-  // 停止音频
+btnStop.addEventListener('click', () => stopPlayback());
+
+// ===== 双击页面暂停 + 显示全部文字 =====
+let pendingFullText = null;
+function stopPlayback() {
   if (currentAudio) { currentAudio.pause(); currentAudio.remove(); currentAudio = null; }
-  // 停止打字动画
   charTimers.forEach(t => clearTimeout(t));
   charTimers = [];
-  // 隐藏气泡
-  hideBubbles();
-  // 隐藏按钮
   btnStop.classList.remove('playing');
+
+  // 如果有待显示的完整文本，立即在聊天面板中显示
+  if (pendingFullText) {
+    hideBubbles();
+    const div = document.createElement('div');
+    div.className = 'message bot';
+    div.textContent = pendingFullText;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    pendingFullText = null;
+  } else {
+    hideBubbles();
+  }
+}
+
+document.addEventListener('dblclick', (e) => {
+  // 避免在按钮/输入框上双击触发
+  if (e.target.closest('.chat-input-area, .quick-bar, .chat-menu-btn')) return;
+  if (pendingFullText || currentAudio) {
+    stopPlayback();
+  }
 });
 
 // ===== 隐藏气泡 =====
@@ -513,7 +533,7 @@ async function sendMsg() {
   if (!text) return;
   userInput.value = '';
 
-  addChatMsg(text, 'user');
+  addChatMsg(text.replace(/^__ENTRY__:[^:]+:/, ''), 'user');
   const loading = addChatMsg('安安正在查找…', 'bot');
 
   try {
@@ -566,6 +586,11 @@ function showBubbleTyping(text) {
   const rounds = [];
   let buf = '';
   for (const para of paragraphs) {
+    // 跳过与下一段重复的短标题行（如"【目的意义】\n目的意义"）
+    if (buf.length < 30 && para.trim() === buf.replace(/[【】\[\]]/g, '').trim()) {
+      buf = para;
+      continue;
+    }
     if (buf && (buf.length + para.length + 1) > MAX_PER_SIDE) {
       rounds.push(buf.trim());
       buf = para;
@@ -574,6 +599,11 @@ function showBubbleTyping(text) {
     }
   }
   if (buf.trim()) rounds.push(buf.trim());
+  // 合并过短的首轮（避免只播标题的停顿）
+  if (rounds.length > 1 && rounds[0].length < 30) {
+    rounds[0] = rounds[0] + '\n' + rounds[1];
+    rounds.splice(1, 1);
+  }
   if (!rounds.length) rounds.push(text);
 
   // 停止之前的音频和动画
@@ -584,6 +614,9 @@ function showBubbleTyping(text) {
 
   // 显示暂停按钮
   btnStop.classList.add('playing');
+
+  // 记录完整文本，供双击暂停时立即显示
+  pendingFullText = text;
 
   // 在用户手势上下文中创建 Audio（移动端必须）
   const audio = new Audio();
@@ -597,6 +630,7 @@ function showBubbleTyping(text) {
       setTimeout(() => { hideBubbles(); }, 1500);
       if (currentAudio) { currentAudio.remove(); currentAudio = null; }
       btnStop.classList.remove('playing');
+      pendingFullText = null;
       return;
     }
 
