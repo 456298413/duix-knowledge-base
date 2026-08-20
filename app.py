@@ -761,6 +761,55 @@ def tts_api():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/preload_tts', methods=['GET', 'POST'])
+def preload_tts():
+    """预生成所有条目的 TTS 音频缓存（后台线程执行，不阻塞返回）"""
+    import threading
+
+    def _do_preload():
+        generated = 0
+        skipped = 0
+        errors = 0
+        for entry in ENTRIES:
+            if entry.get('id', '') in FILE_HEADER_IDS:
+                continue
+            content = entry.get('content', '').strip()
+            if len(content) < 20:
+                continue
+            if any(b in content for b in BLACKLIST):
+                continue
+            title = entry.get('title', '').strip()
+            # 生成两种格式的文本（匹配 /api/ask 返回的两种 answer 格式）
+            texts = [
+                f"【{title}】\n{content}",
+                f"【{title}】\n{content}\n（来源：{entry.get('source_title', '')}）",
+            ]
+            for text in texts:
+                cache_path = _tts_cache_path(text)
+                if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+                    skipped += 1
+                    continue
+                try:
+                    async def _generate(t=text):
+                        comm = Communicate(t, "zh-CN-XiaoxiaoNeural", rate="-5%", pitch="+2Hz")
+                        chunks = []
+                        async for chunk in comm.stream():
+                            if chunk["type"] == "audio":
+                                chunks.append(chunk["data"])
+                        return b''.join(chunks)
+                    audio_data = asyncio.run(_generate())
+                    with open(cache_path, 'wb') as f:
+                        f.write(audio_data)
+                    generated += 1
+                except Exception as e:
+                    errors += 1
+                    print(f"TTS preload error: {e}")
+        print(f"TTS preload done: generated={generated}, skipped={skipped}, errors={errors}")
+
+    threading.Thread(target=_do_preload, daemon=True).start()
+    return jsonify({'success': True, 'message': 'preload started in background'})
+
+
 @app.route('/api/stt', methods=['POST'])
 def stt_api():
     """语音转文字：接收音频 → 转为 WAV → Google STT 识别中文"""

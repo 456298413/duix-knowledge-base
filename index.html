@@ -668,22 +668,32 @@ function showBubbleTyping(text) {
     const audio = new Audio();
     currentAudio = audio;
 
-    // 立即开始打字（不等音频），音频到了自动同步
-    startChatTyping(text, audio, () => {
+    const onTypingDone = () => {
       setTimeout(() => { hideBubbles(); }, 1500);
       if (currentAudio) { currentAudio.remove(); currentAudio = null; }
       btnStop.classList.remove('playing');
       pendingFullText = null;
-    });
+    };
 
-    // 并行获取音频，加载完成后播放
+    // 先获取 TTS 音频，就绪后同时启动播放和打字，确保完美同步
     fetch(`${API_BASE}/api/tts?text=${encodeURIComponent(text)}`)
       .then(r => r.blob())
       .then(blob => {
         audio.src = URL.createObjectURL(blob);
-        audio.play().catch(() => {});
+        const startBoth = () => {
+          audio.play().catch(() => {});
+          startChatTyping(text, audio, onTypingDone);
+        };
+        if (audio.readyState >= 1 && isFinite(audio.duration) && audio.duration > 0) {
+          startBoth();
+        } else {
+          audio.addEventListener('loadedmetadata', startBoth, { once: true });
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        // TTS 失败时降级为固定速度打字（无语音）
+        startChatTyping(text, null, onTypingDone);
+      });
     return;
   }
 
@@ -733,24 +743,87 @@ function showBubbleTyping(text) {
       setTimeout(playRound, 600);
     };
 
-    startTypingRAF(charSpans, cursor, innerDiv, bubble, 100, onDone);
-
-    // 同时请求 TTS 音频
+    // 先获取 TTS 音频，就绪后同时启动播放和打字，确保完美同步
     fetch(`${API_BASE}/api/tts?text=${encodeURIComponent(rText)}`)
       .then(r => r.blob())
       .then(blob => {
         audio.src = URL.createObjectURL(blob);
-        audio.play().catch(() => {});
+        // 等待音频元数据就绪后同时启动播放和打字动画
+        const startBoth = () => {
+          audio.play().catch(() => {});
+          startTypingAudioDriven(charSpans, cursor, innerDiv, bubble, audio, onDone);
+        };
+        if (audio.readyState >= 1 && isFinite(audio.duration) && audio.duration > 0) {
+          startBoth();
+        } else {
+          audio.addEventListener('loadedmetadata', startBoth, { once: true });
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        // TTS 失败时降级为固定速度打字（无语音）
+        startTypingRAF(charSpans, cursor, innerDiv, bubble, 80, onDone);
+      });
   }
 
   playRound();
 }
 
 /**
- * 基于 requestAnimationFrame 的打字动画（替代 setTimeout，手机端流畅）
- * 单个 rAF 循环驱动所有字符显示，不会创建数百个定时器
+ * 音频驱动的打字动画：用 audio.currentTime 作为时钟源
+ * 保证文字显示与语音播报严格同步
+ */
+function startTypingAudioDriven(spans, cursor, container, bubble, audio, onDone) {
+  if (typingRafId) {
+    cancelAnimationFrame(typingRafId);
+    typingRafId = null;
+  }
+
+  let charIndex = 0;
+  const totalChars = spans.length;
+  const audioDuration = audio.duration;
+
+  function tick() {
+    if (!isFinite(audioDuration) || audioDuration <= 0) {
+      // 降级：固定速度
+      if (charIndex < totalChars) {
+        spans[charIndex].classList.add('visible');
+        if (charIndex > 0) spans[charIndex - 1].classList.remove('active-char');
+        spans[charIndex].classList.add('active-char');
+        charIndex++;
+      }
+    } else {
+      const progress = Math.min(audio.currentTime / audioDuration, 1);
+      const targetIdx = Math.floor(progress * totalChars);
+      while (charIndex < totalChars && charIndex <= targetIdx) {
+        spans[charIndex].classList.add('visible');
+        if (charIndex > 0) spans[charIndex - 1].classList.remove('active-char');
+        spans[charIndex].classList.add('active-char');
+        charIndex++;
+      }
+    }
+
+    if (container.parentNode) {
+      container.appendChild(cursor);
+    }
+    if (bubble.scrollHeight > bubble.clientHeight) {
+      bubble.scrollTop = bubble.scrollHeight;
+    }
+
+    if (charIndex < totalChars) {
+      typingRafId = requestAnimationFrame(tick);
+    } else {
+      typingRafId = null;
+      if (spans.length > 0) spans[spans.length - 1].classList.remove('active-char');
+      cursor.remove();
+      onDone();
+    }
+  }
+
+  typingRafId = requestAnimationFrame(tick);
+}
+
+/**
+ * 固定速度打字动画（TTS 不可用时的降级方案）
  */
 function startTypingRAF(spans, cursor, container, bubble, msPerChar, onDone) {
   if (typingRafId) {
@@ -758,13 +831,10 @@ function startTypingRAF(spans, cursor, container, bubble, msPerChar, onDone) {
     typingRafId = null;
   }
 
-  const cancelFlag = { cancelled: false };
   let charIndex = 0;
   let lastTime = performance.now();
 
   function tick(now) {
-    if (cancelFlag.cancelled) return;
-
     const delta = now - lastTime;
     if (delta >= msPerChar) {
       const steps = Math.floor(delta / msPerChar);
@@ -805,6 +875,11 @@ function addChatMsg(text, type) {
   chatMessages.scrollTop = chatMessages.scrollHeight;
   return div;
 }
+
+// ===== 页面加载时预生成 TTS 缓存 =====
+window.addEventListener('DOMContentLoaded', () => {
+  fetch(`${API_BASE}/api/preload_tts`).catch(() => {});
+});
 
 // ===== 事件绑定 =====
 btnSend.addEventListener('click', sendMsg);
