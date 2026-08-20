@@ -501,8 +501,10 @@ function hideBubbles() {
 
 /**
  * 手机端：在聊天面板内逐字显示 + 打字机效果（不使用气泡）
+ * 用音频 currentTime 驱动打字进度，保证音频与文字严格同步。
+ * 如果音频尚未就绪，先用固定速度显示，音频就绪后切换到音频驱动。
  */
-function startChatTyping(text, onDone) {
+function startChatTyping(text, audio, onDone) {
   const msg = document.createElement('div');
   msg.className = 'message bot';
   const inner = document.createElement('span');
@@ -524,23 +526,55 @@ function startChatTyping(text, onDone) {
   }
 
   let charIdx = 0;
-  let lastT = performance.now();
+  let audioReady = false;
+  let audioDuration = 0;
+  let fallbackStart = performance.now();
+  const FALLBACK_INTERVAL = 65; // 备用：音频未就绪时 65ms/字
+
+  // 监听音频元数据，获取时长
+  if (audio) {
+    const onMeta = () => {
+      if (isFinite(audio.duration) && audio.duration > 0) {
+        audioDuration = audio.duration;
+        audioReady = true;
+        // 重新映射已显示的字符进度到音频时间轴
+        fallbackStart = performance.now() - (charIdx * (audioDuration * 1000 / chars.length));
+      }
+    };
+    if (audio.readyState >= 1 && isFinite(audio.duration) && audio.duration > 0) {
+      onMeta();
+    } else {
+      audio.addEventListener('loadedmetadata', onMeta, { once: true });
+      audio.addEventListener('durationchange', onMeta);
+    }
+  }
+
+  function advanceChars(targetIdx) {
+    while (charIdx < chars.length && charIdx < targetIdx) {
+      chars[charIdx].classList.add('visible');
+      if (charIdx > 0) chars[charIdx - 1].classList.remove('active-char');
+      chars[charIdx].classList.add('active-char');
+      charIdx++;
+    }
+  }
 
   function tick(now) {
-    const dt = now - lastT;
-    if (dt >= 80) {
-      const steps = Math.floor(dt / 80);
-      for (let i = 0; i < steps && charIdx < chars.length; i++) {
-        chars[charIdx].classList.add('visible');
-        if (charIdx > 0) chars[charIdx - 1].classList.remove('active-char');
-        chars[charIdx].classList.add('active-char');
-        charIdx++;
-      }
-      lastT = now - (dt % 80);
+    let targetIdx;
+    if (audioReady && audioDuration > 0) {
+      // 以音频 currentTime 为时钟源
+      const progress = Math.min(audio.currentTime / audioDuration, 1);
+      targetIdx = Math.floor(progress * chars.length);
+    } else {
+      // 音频未就绪，用固定速度
+      const elapsed = now - fallbackStart;
+      targetIdx = Math.floor(elapsed / FALLBACK_INTERVAL);
     }
+    advanceChars(targetIdx);
+
     if (charIdx < chars.length) {
       typingRafId = requestAnimationFrame(tick);
     } else {
+      // 所有字符已显示
       typingRafId = null;
       if (chars.length) chars[chars.length - 1].classList.remove('active-char');
       cursor.remove();
@@ -636,27 +670,44 @@ function showBubbleTyping(text) {
 
   // 手机端：直接在聊天面板内打字显示，不用气泡
   if (window.innerWidth <= 768) {
-    const msg = document.createElement('div');
-    msg.className = 'message bot';
-    chatMessages.appendChild(msg);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-
     const audio = new Audio();
     currentAudio = audio;
+
+    // 先获取音频，拿到 duration 后再开始打字+播放
+    let started = false;
     fetch(`${API_BASE}/api/tts?text=${encodeURIComponent(text)}`)
       .then(r => r.blob())
       .then(blob => {
         audio.src = URL.createObjectURL(blob);
-        audio.play().catch(() => {});
+        // 等待 duration 就绪后一起启动
+        const startAll = () => {
+          if (started) return;
+          started = true;
+          audio.play().catch(() => {});
+          startChatTyping(text, audio, () => {
+            setTimeout(() => { hideBubbles(); }, 1500);
+            if (currentAudio) { currentAudio.remove(); currentAudio = null; }
+            btnStop.classList.remove('playing');
+            pendingFullText = null;
+          });
+        };
+        if (isFinite(audio.duration) && audio.duration > 0) {
+          startAll();
+        } else {
+          audio.addEventListener('loadedmetadata', startAll, { once: true });
+          // 兜底：如果 2 秒内仍未就绪，强制启动（用备用固定速度）
+          setTimeout(startAll, 2000);
+        }
       })
-      .catch(() => {});
-
-    startChatTyping(text, () => {
-      setTimeout(() => { hideBubbles(); }, 1500);
-      if (currentAudio) { currentAudio.remove(); currentAudio = null; }
-      btnStop.classList.remove('playing');
-      pendingFullText = null;
-    });
+      .catch(() => {
+        // 网络失败，仍用固定速度显示文字
+        startChatTyping(text, null, () => {
+          setTimeout(() => { hideBubbles(); }, 1500);
+          if (currentAudio) { currentAudio.remove(); currentAudio = null; }
+          btnStop.classList.remove('playing');
+          pendingFullText = null;
+        });
+      });
     return;
   }
 
