@@ -712,12 +712,32 @@ def ask():
         return jsonify({'success': False, 'answer': '查询出错：' + str(e)}), 500
 
 
+# ============================================================
+# TTS 缓存：相同文本只生成一次音频
+# ============================================================
+import hashlib
+
+TTS_CACHE_DIR = os.path.join(_base_dir, 'tts_cache')
+os.makedirs(TTS_CACHE_DIR, exist_ok=True)
+
+def _tts_cache_path(text):
+    h = hashlib.md5(text.encode('utf-8')).hexdigest()
+    return os.path.join(TTS_CACHE_DIR, f'{h}.mp3')
+
 @app.route('/api/tts', methods=['GET'])
 def tts_api():
-    """将文本转为 MP3 音频返回（温柔女声 XiaoxiaoNeural）"""
+    """将文本转为 MP3 音频返回（温柔女声 XiaoxiaoNeural），带文件缓存"""
     text = request.args.get('text', '').strip()
     if not text:
         return jsonify({'success': False, 'error': 'text is required'}), 400
+
+    # 命中缓存 → 直接返回文件（~10ms）
+    cache_path = _tts_cache_path(text)
+    if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+        return send_file(cache_path, mimetype='audio/mpeg', as_attachment=False,
+                         download_name='tts.mp3')
+
+    # 未命中 → 生成音频
     try:
         async def _generate():
             communicate = Communicate(text, "zh-CN-XiaoxiaoNeural", rate="-5%", pitch="+2Hz")
@@ -728,6 +748,11 @@ def tts_api():
             return b''.join(chunks)
 
         audio_data = asyncio.run(_generate())
+
+        # 写入缓存
+        with open(cache_path, 'wb') as f:
+            f.write(audio_data)
+
         buf = BytesIO(audio_data)
         buf.seek(0)
         return send_file(buf, mimetype='audio/mpeg', as_attachment=False,
