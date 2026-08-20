@@ -494,20 +494,63 @@ quickBar.addEventListener('click', (e) => {
 });
 
 // ===== 语音识别 =====
+// 检测是否是手机端
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
 function initRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { btnVoice.style.display = 'none'; return; }
-  recognition = new SR();
-  recognition.lang = 'zh-CN';
-  recognition.continuous = false;
-  recognition.onstart = () => btnVoice.classList.add('recording');
-  recognition.onend = () => btnVoice.classList.remove('recording');
-  recognition.onresult = e => { userInput.value = e.results[0][0].transcript; sendMsg(); };
-  recognition.onerror = () => btnVoice.classList.remove('recording');
+  // 更严格的兼容性检测：API存在 + 不是已知有问题的移动端浏览器
+  if (!SR) { 
+    btnVoice.style.display = 'none'; 
+    return; 
+  }
+  
+  // 尝试创建 recognition 实例来验证是否真的可用
+  try {
+    recognition = new SR();
+    recognition.lang = 'zh-CN';
+    recognition.continuous = false;
+    recognition.onstart = () => btnVoice.classList.add('recording');
+    recognition.onend = () => btnVoice.classList.remove('recording');
+    recognition.onresult = e => { userInput.value = e.results[0][0].transcript; sendMsg(); };
+    recognition.onerror = (e) => { 
+      btnVoice.classList.remove('recording');
+      // 如果启动失败，隐藏按钮
+      if (e.error === 'not-supported' || e.error === 'no-speech') {
+        btnVoice.style.display = 'none';
+      }
+    };
+    
+    // 在移动端，如果 API 存在但实际不可用，尝试启动一次来验证
+    if (isMobile) {
+      // 延迟检测，避免阻塞页面加载
+      setTimeout(() => {
+        try {
+          recognition.start();
+          // 如果能启动，立即停止
+          setTimeout(() => recognition.stop(), 100);
+        } catch(e) {
+          // 启动失败，隐藏按钮
+          btnVoice.style.display = 'none';
+          recognition = null;
+        }
+      }, 500);
+    }
+  } catch(e) {
+    // 创建失败，隐藏按钮
+    btnVoice.style.display = 'none';
+    recognition = null;
+  }
 }
 
 btnVoice.addEventListener('click', () => {
-  if (!recognition) return;
+  if (!recognition) {
+    // 不支持语音输入，给用户提示
+    if (isMobile) {
+      alert('当前浏览器不支持语音输入，请使用键盘输入');
+    }
+    return;
+  }
   btnVoice.classList.contains('recording') ? recognition.stop() : recognition.start();
 });
 
@@ -754,23 +797,16 @@ function speakAndShow(text, warmVoice) {
     window.speechSynthesis.resume();
     window.speechSynthesis.speak(utter);
 
-    // 兜底：200ms后如果还没开始播放，用全新 utterance 重试（覆盖部分手机浏览器场景）
+    // 兜底方案：200ms后如果还没开始播放，用 AudioContext 生成提示音（手机端降级）
     if (roundIdx === 0) {
       const onendRef = utter.onend;
       const onerrorRef = utter.onerror;
       setTimeout(() => {
         if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending && isSpeaking) {
-          // 主 utterance 没有成功播放，用 fallback 重试
-          const fb = new SpeechSynthesisUtterance(rText);
-          fb.lang = 'zh-CN';
-          fb.rate = SPEECH_RATE;
-          fb.pitch = 1.1;
-          if (voice) fb.voice = voice;
-          fb.onstart = () => {};
-          fb.onend = onendRef;
-          fb.onerror = onerrorRef;
-          window.speechSynthesis.resume();
-          window.speechSynthesis.speak(fb);
+          // TTS 没有成功播放，用 AudioContext 播放提示音
+          playBeep();
+          // 仍然执行 onend 回调，继续后续逻辑
+          if (onendRef) onendRef();
         }
       }, 200);
     }
@@ -783,6 +819,22 @@ function speakAndShow(text, warmVoice) {
 // 关键：手机浏览器只允许在用户手势的同步代码中触发语音
 // 所以必须在 fetch 之前就调用 speak()，利用浏览器的语音队列机制
 let currentUtter = null; // 当前正在使用的语音对象
+// 手机端声音降级方案：用 AudioContext 生成提示音
+let audioContext = null;
+
+function playBeep() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  oscillator.frequency.value = 800;
+  gainNode.gain.value = 0.1;
+  oscillator.start();
+  setTimeout(() => oscillator.stop(), 200);
+}
 
 async function sendMsg() {
   const text = userInput.value.trim();
@@ -795,6 +847,16 @@ async function sendMsg() {
   // ===== 关键修复：在同步代码中立即触发语音 =====
   // 手机浏览器只允许在用户手势的同步代码中触发 TTS
   // 利用浏览器的语音队列机制：先入队的先播放
+  
+  // 同时初始化 AudioContext（用于降级方案）
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  // 在用户手势中恢复 AudioContext（某些浏览器需要）
+  if (audioContext && audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+  
   if (window.speechSynthesis) {
     try {
       window.speechSynthesis.cancel(); // 清除之前的语音
@@ -813,7 +875,11 @@ async function sendMsg() {
       }
       // 立即调用 speak——这是关键！必须在同步代码中调用
       window.speechSynthesis.speak(currentUtter);
-    } catch(e) { currentUtter = null; }
+    } catch(e) { 
+      currentUtter = null;
+      // TTS 完全不可用，用提示音代替
+      playBeep();
+    }
   }
 
   try {
