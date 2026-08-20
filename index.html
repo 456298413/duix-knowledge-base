@@ -499,6 +499,58 @@ function hideBubbles() {
   if (typingRafId) { cancelAnimationFrame(typingRafId); typingRafId = null; }
 }
 
+/**
+ * 手机端：在聊天面板内逐字显示 + 打字机效果（不使用气泡）
+ */
+function startChatTyping(text, onDone) {
+  const msg = document.createElement('div');
+  msg.className = 'message bot';
+  const inner = document.createElement('span');
+  inner.style.cssText = 'white-space:pre-wrap;';
+  msg.appendChild(inner);
+  const cursor = document.createElement('span');
+  cursor.className = 'tw-cursor';
+  msg.appendChild(cursor);
+  chatMessages.appendChild(msg);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  const chars = [];
+  for (const ch of text) {
+    const s = document.createElement('span');
+    s.className = 'tw-char';
+    s.textContent = ch;
+    inner.appendChild(s);
+    chars.push(s);
+  }
+
+  let charIdx = 0;
+  let lastT = performance.now();
+
+  function tick(now) {
+    const dt = now - lastT;
+    if (dt >= 80) {
+      const steps = Math.floor(dt / 80);
+      for (let i = 0; i < steps && charIdx < chars.length; i++) {
+        chars[charIdx].classList.add('visible');
+        if (charIdx > 0) chars[charIdx - 1].classList.remove('active-char');
+        chars[charIdx].classList.add('active-char');
+        charIdx++;
+      }
+      lastT = now - (dt % 80);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    if (charIdx < chars.length) {
+      typingRafId = requestAnimationFrame(tick);
+    } else {
+      typingRafId = null;
+      if (chars.length) chars[chars.length - 1].classList.remove('active-char');
+      cursor.remove();
+      onDone();
+    }
+  }
+  typingRafId = requestAnimationFrame(tick);
+}
+
 // ===== 发送消息 =====
 async function sendMsg() {
   const text = userInput.value.trim();
@@ -582,6 +634,32 @@ function showBubbleTyping(text) {
 
   btnStop.classList.add('playing');
   pendingFullText = text;
+
+  // 手机端：直接在聊天面板内打字显示，不用气泡
+  if (window.innerWidth <= 768) {
+    const msg = document.createElement('div');
+    msg.className = 'message bot';
+    chatMessages.appendChild(msg);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    const audio = new Audio();
+    currentAudio = audio;
+    fetch(`${API_BASE}/api/tts?text=${encodeURIComponent(text)}`)
+      .then(r => r.blob())
+      .then(blob => {
+        audio.src = URL.createObjectURL(blob);
+        audio.play().catch(() => {});
+      })
+      .catch(() => {});
+
+    startChatTyping(text, () => {
+      setTimeout(() => { hideBubbles(); }, 1500);
+      if (currentAudio) { currentAudio.remove(); currentAudio = null; }
+      btnStop.classList.remove('playing');
+      pendingFullText = null;
+    });
+    return;
+  }
 
   const audio = new Audio();
   currentAudio = audio;
