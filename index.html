@@ -483,7 +483,7 @@ let particleTimer = null;
 let recognition = null;
 let charTimers = [];
 let scrollAnimId = null;
-let pendingUtter = null; // 用于移动端手势绑定的预创建语音对象
+// pendingUtter 已废弃，改用 currentUtter（在 sendMsg 中同步创建并立即 speak）
 
 // ===== 快捷按钮 =====
 quickBar.addEventListener('click', (e) => {
@@ -556,9 +556,9 @@ function hideBubbles() {
 }
 
 // ===== 语音播报 + 打字机逐字出现 =====
-// warmVoice: 如果传入了在手势上下文中预创建的语音对象，复用它而不是创建新的
+// warmVoice: 如果传入了在手势上下文中创建的语音对象，复用它（不cancel）
 function speakAndShow(text, warmVoice) {
-  // 只有非预热模式才 cancel，避免打断手势上下文中正在播放的语音
+  // 只有非 warmVoice 模式才 cancel，避免打断手势上下文中的语音
   if (!warmVoice) {
     window.speechSynthesis.cancel();
   }
@@ -780,33 +780,41 @@ function speakAndShow(text, warmVoice) {
 }
 
 // ===== 发送消息 =====
+// 关键：手机浏览器只允许在用户手势的同步代码中触发语音
+// 所以必须在 fetch 之前就调用 speak()，利用浏览器的语音队列机制
+let currentUtter = null; // 当前正在使用的语音对象
+
 async function sendMsg() {
   const text = userInput.value.trim();
   if (!text) return;
   userInput.value = '';
 
-  // 在用户点击的同步代码中创建语音对象，解决手机浏览器拦截
+  addChatMsg(text, 'user');
+  const loading = addChatMsg('安安正在查找…', 'bot');
+
+  // ===== 关键修复：在同步代码中立即触发语音 =====
+  // 手机浏览器只允许在用户手势的同步代码中触发 TTS
+  // 利用浏览器的语音队列机制：先入队的先播放
   if (window.speechSynthesis) {
     try {
-      // 先 resume 确保引擎处于活跃状态（某些手机浏览器播完后会暂停）
-      window.speechSynthesis.resume();
-      window.speechSynthesis.cancel();
-      pendingUtter = new SpeechSynthesisUtterance('.');
-      pendingUtter.lang = 'zh-CN';
-      pendingUtter.rate = 0.92;
-      pendingUtter.pitch = 1.1;
+      window.speechSynthesis.cancel(); // 清除之前的语音
+      // 立即创建一个占位语音并 speak（在同步代码中！）
+      // 它会被放入队列，等 API 响应回来后再用实际内容替换
+      currentUtter = new SpeechSynthesisUtterance('正在查询');
+      currentUtter.lang = 'zh-CN';
+      currentUtter.rate = 0.92;
+      currentUtter.pitch = 1.1;
+      // 设置语音
       const voices = window.speechSynthesis.getVoices();
       const prefs = ['Microsoft Xiaoxiao','Xiaoxiao','Huihui','Microsoft Huihui','Google 普通话','Ting-Ting'];
       for (const name of prefs) {
         const v = voices.find(v => v.name.includes(name) && v.lang.startsWith('zh'));
-        if (v) { pendingUtter.voice = v; break; }
+        if (v) { currentUtter.voice = v; break; }
       }
-      window.speechSynthesis.speak(pendingUtter);
-    } catch(e) {}
+      // 立即调用 speak——这是关键！必须在同步代码中调用
+      window.speechSynthesis.speak(currentUtter);
+    } catch(e) { currentUtter = null; }
   }
-
-  addChatMsg(text, 'user');
-  const loading = addChatMsg('安安正在查找…', 'bot');
 
   try {
     const resp = await fetch(`${API_BASE}/api/ask?question=${encodeURIComponent(text)}`);
@@ -823,7 +831,7 @@ async function sendMsg() {
         botDiv.appendChild(tag);
       }
 
-      // 菜单/澄清类型 → 显示可点击按钮
+      // 菜单/澄清类型 → 显示可点击按钮（不需要语音播报）
       if ((data.type === 'menu' || data.type === 'clarify') && data.menu_items && data.menu_items.length) {
         const menuDiv = document.createElement('div');
         menuDiv.className = 'chat-menu-options';
@@ -832,7 +840,6 @@ async function sendMsg() {
           btn.className = 'chat-menu-btn';
           btn.textContent = item.label;
           btn.addEventListener('click', () => {
-            // 发送 __ENTRY__:key:label 格式，后端通过 key 精确查找条目
             const sendText = item.key ? `__ENTRY__:${item.key}:${item.label}` : item.label;
             userInput.value = sendText;
             sendMsg();
@@ -841,37 +848,72 @@ async function sendMsg() {
         }
         botDiv.appendChild(menuDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
-        // 菜单类型：取消语音
-        if (pendingUtter) {
-          window.speechSynthesis.cancel();
-          pendingUtter = null;
-        }
+        // 菜单类型：取消语音，显示文字即可
+        window.speechSynthesis.cancel();
+        currentUtter = null;
         bubbleLeft.textContent = data.answer.split('\n')[0];
         bubbleRight.textContent = '';
         bubbleLeft.classList.add('visible');
         return;
       }
 
-      // 详情类型 → 用预创建的语音对象播报（不cancel！保持手势上下文）
-      if (data.type === 'detail') {
-        speakAndShow(data.answer, pendingUtter);
-        pendingUtter = null;
-      } else {
-        // 非 detail 类型（not_found 等），清理预热语音
-        if (pendingUtter) {
-          window.speechSynthesis.cancel();
-          pendingUtter = null;
+      // ===== 详情类型：用实际内容替换占位语音 =====
+      if (data.type === 'detail' && currentUtter) {
+        // 修改占位语音的文本为实际答案
+        currentUtter.text = data.answer;
+        // 重新设置语音（确保 voices 已加载）
+        const voices = window.speechSynthesis.getVoices();
+        const prefs = ['Microsoft Xiaoxiao','Xiaoxiao','Huihui','Microsoft Huihui','Google 普通话','Ting-Ting'];
+        for (const name of prefs) {
+          const v = voices.find(v => v.name.includes(name) && v.lang.startsWith('zh'));
+          if (v) { currentUtter.voice = v; break; }
         }
+        
+        let handled = false;
+        // 设置 onend 回调："正在查询"播完后自动播放实际答案
+        currentUtter.onend = () => {
+          if (!handled) {
+            handled = true;
+            // 此时在手势上下文中（因为是连续播放）
+            speakAndShow(data.answer, currentUtter);
+            currentUtter = null;
+          }
+        };
+        currentUtter.onerror = () => {
+          if (!handled) {
+            handled = true;
+            window.speechSynthesis.cancel();
+            speakAndShow(data.answer);
+            currentUtter = null;
+          }
+        };
+        // 兜底：150ms 后如果 onend 还没触发，说明占位语音已经播完了
+        // 直接用新对象播放（此时已不在手势上下文，手机上可能失败，但至少文字能显示）
+        setTimeout(() => {
+          if (!handled) {
+            handled = true;
+            window.speechSynthesis.cancel();
+            speakAndShow(data.answer);
+            currentUtter = null;
+          }
+        }, 150);
+      } else {
+        // 非 detail 类型或 currentUtter 为空，直接播放
+        window.speechSynthesis.cancel();
+        speakAndShow(data.answer);
+        currentUtter = null;
       }
 
     } else {
       addChatMsg('抱歉，未找到相关信息。', 'bot');
-      if (pendingUtter) { window.speechSynthesis.cancel(); pendingUtter = null; }
+      window.speechSynthesis.cancel();
+      currentUtter = null;
     }
   } catch (err) {
     loading.remove();
     addChatMsg('网络连接失败，请稍后重试。', 'bot');
-    if (pendingUtter) { window.speechSynthesis.cancel(); pendingUtter = null; }
+    window.speechSynthesis.cancel();
+    currentUtter = null;
   }
 }
 
