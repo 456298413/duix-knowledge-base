@@ -9,6 +9,8 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from io import BytesIO
 import asyncio
+import speech_recognition as sr
+from pydub import AudioSegment
 from edge_tts import Communicate
 
 app = Flask(__name__)
@@ -732,6 +734,35 @@ def tts_api():
                          download_name='tts.mp3')
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/stt', methods=['POST'])
+def stt_api():
+    """语音转文字：接收音频 → 转为 WAV → Google STT 识别中文"""
+    if 'audio' not in request.files:
+        return jsonify({'success': False, 'error': '没有收到音频文件'}), 400
+    try:
+        audio_file = request.files['audio']
+        # 读取上传的音频（webm/ogg/mp4 等格式）
+        audio_seg = AudioSegment.from_file(audio_file)
+        # 转为 WAV（16kHz 单声道，Google STT 要求的格式）
+        wav_seg = audio_seg.set_frame_rate(16000).set_channels(1)
+        wav_buf = BytesIO()
+        wav_seg.export(wav_buf, format='wav')
+        wav_buf.seek(0)
+
+        # 用 Google 免费语音识别（支持中文）
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(wav_buf) as source:
+            audio_data = recognizer.record(source)
+        text = recognizer.recognize_google(audio_data, language='zh-CN')
+        return jsonify({'success': True, 'text': text})
+    except sr.UnknownValueError:
+        return jsonify({'success': False, 'error': '未能识别语音内容，请再说一次'}), 200
+    except sr.RequestError as e:
+        return jsonify({'success': False, 'error': f'语音识别服务不可用: {e}'}), 503
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'处理失败: {str(e)}'}), 500
 
 
 @app.route('/api/health', methods=['GET'])

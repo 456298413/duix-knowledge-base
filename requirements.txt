@@ -3,3 +3,5 @@ flask-cors==4.0.0
 gunicorn==21.2.0
 PyJWT==2.8.0
 edge-tts>=6.1.0
+SpeechRecognition>=3.10.0
+pydub>=0.25.1

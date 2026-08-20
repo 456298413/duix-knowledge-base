@@ -468,9 +468,14 @@ const btnVoice = document.getElementById('btnVoice');
 const btnStop = document.getElementById('btnStop');
 const quickBar = document.getElementById('quickBar');
 
-let recognition = null;
-let charTimers = [];
 let currentAudio = null;
+let typingRafId = null;
+
+// 录音状态
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let mediaStream = null;
 
 // ===== 快捷按钮 =====
 quickBar.addEventListener('click', (e) => {
@@ -480,51 +485,65 @@ quickBar.addEventListener('click', (e) => {
   sendMsg();
 });
 
-// ===== 语音识别 =====
-const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-function initRecognition() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    btnVoice.style.display = 'none';
-    return;
-  }
+// ===== 语音输入（MediaRecorder 录音 + 后端转写） =====
+async function startVoiceRecording() {
   try {
-    recognition = new SR();
-    recognition.lang = 'zh-CN';
-    recognition.continuous = false;
-    recognition.onstart = () => btnVoice.classList.add('recording');
-    recognition.onend = () => btnVoice.classList.remove('recording');
-    recognition.onresult = e => { userInput.value = e.results[0][0].transcript; sendMsg(); };
-    recognition.onerror = (e) => {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+    mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
       btnVoice.classList.remove('recording');
-      if (e.error === 'not-supported' || e.error === 'no-speech') {
-        btnVoice.style.display = 'none';
+      isRecording = false;
+      btnVoice.textContent = '🎤';
+      // 发送到后端转文字
+      try {
+        btnVoice.style.opacity = '0.5';
+        btnVoice.style.pointerEvents = 'none';
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'voice.webm');
+        const resp = await fetch(`${API_BASE}/api/stt`, { method: 'POST', body: formData });
+        const data = await resp.json();
+        btnVoice.style.opacity = '';
+        btnVoice.style.pointerEvents = '';
+        if (data.success && data.text) {
+          userInput.value = data.text;
+          sendMsg();
+        } else {
+          alert('语音识别失败：' + (data.error || '未识别到内容'));
+        }
+      } catch (err) {
+        btnVoice.style.opacity = '';
+        btnVoice.style.pointerEvents = '';
+        alert('语音识别请求失败：' + err.message);
       }
     };
-    if (isMobile) {
-      setTimeout(() => {
-        try {
-          recognition.start();
-          setTimeout(() => recognition.stop(), 100);
-        } catch(e) {
-          btnVoice.style.display = 'none';
-          recognition = null;
-        }
-      }, 500);
-    }
-  } catch(e) {
-    btnVoice.style.display = 'none';
-    recognition = null;
+    mediaRecorder.start();
+    isRecording = true;
+    btnVoice.classList.add('recording');
+    btnVoice.textContent = '⏹';
+  } catch (err) {
+    alert('无法访问麦克风，请在浏览器设置中允许麦克风权限\n\n' + err.message);
+  }
+}
+
+function stopVoiceRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
   }
 }
 
 btnVoice.addEventListener('click', () => {
-  if (!recognition) {
-    if (isMobile) alert('当前浏览器不支持语音输入，请使用键盘输入');
-    return;
+  if (isRecording) {
+    stopVoiceRecording();
+  } else {
+    startVoiceRecording();
   }
-  btnVoice.classList.contains('recording') ? recognition.stop() : recognition.start();
 });
 
 // ===== 暂停播报按钮 =====
@@ -534,8 +553,7 @@ btnStop.addEventListener('click', () => stopPlayback());
 let pendingFullText = null;
 function stopPlayback() {
   if (currentAudio) { currentAudio.pause(); currentAudio.remove(); currentAudio = null; }
-  charTimers.forEach(t => clearTimeout(t));
-  charTimers = [];
+  if (typingRafId) { cancelAnimationFrame(typingRafId); typingRafId = null; }
   btnStop.classList.remove('playing');
 
   // 如果有待显示的完整文本，立即在聊天面板中显示
@@ -568,8 +586,7 @@ function hideBubbles() {
   bubbleRight.innerHTML = '';
   bubbleLeft.className = 'bubble bubble-left';
   bubbleRight.className = 'bubble bubble-right';
-  charTimers.forEach(t => clearTimeout(t));
-  charTimers = [];
+  if (typingRafId) { cancelAnimationFrame(typingRafId); typingRafId = null; }
 }
 
 // ===== 发送消息 =====
@@ -649,16 +666,13 @@ function showBubbleTyping(text) {
   }
   if (!rounds.length) rounds.push(text);
 
-  // 停止之前的音频和动画
   if (currentAudio) { currentAudio.pause(); currentAudio.remove(); currentAudio = null; }
-  charTimers.forEach(t => clearTimeout(t));
-  charTimers = [];
+  if (typingRafId) { cancelAnimationFrame(typingRafId); typingRafId = null; }
   hideBubbles();
 
   btnStop.classList.add('playing');
   pendingFullText = text;
 
-  // 在用户手势上下文中创建 Audio（移动端必须）
   const audio = new Audio();
   currentAudio = audio;
 
@@ -679,7 +693,6 @@ function showBubbleTyping(text) {
 
     const bubble = side === 'left' ? bubbleLeft : bubbleRight;
 
-    // 创建逐字容器
     const innerDiv = document.createElement('div');
     innerDiv.style.cssText = 'position:relative;';
     bubble.appendChild(innerDiv);
@@ -697,47 +710,38 @@ function showBubbleTyping(text) {
     cursor.className = 'tw-cursor';
     innerDiv.appendChild(cursor);
 
-    // 初始打字速度：100ms/字，立即开始不等音频
-    let typingDone = false;
-    const onTypingDone = () => {
-      if (typingDone) return;
-      typingDone = true;
+    // 用 requestAnimationFrame 驱动的打字动画（手机端不会被限流）
+    let done = false;
+    const onDone = () => {
+      if (done) return;
+      done = true;
       roundIdx++;
       setTimeout(playRound, 600);
     };
 
-    startTyping(charSpans, cursor, innerDiv, bubble, 100, onTypingDone);
+    startTypingRAF(charSpans, cursor, innerDiv, bubble, 100, onDone);
 
-    // 同时请求并播放 TTS 音频，加载完后同步打字速度与音频时长
+    // 同时请求 TTS 音频，加载后按音频时长同步打字速度
     fetch(`${API_BASE}/api/tts?text=${encodeURIComponent(rText)}`)
       .then(r => r.blob())
       .then(blob => {
         const url = URL.createObjectURL(blob);
         audio.src = url;
 
-        // 音频就绪后，根据音频时长重新计算打字速度
-        const setSyncedSpeed = () => {
+        const syncSpeed = () => {
           const dur = audio.duration;
-          if (dur && dur > 0 && !typingDone) {
+          if (dur && dur > 0 && !done) {
             const syncedMs = Math.max(30, (dur * 1000) / rText.length);
-            // 重启打字动画，用与音频匹配的速度
-            charTimers.forEach(t => clearTimeout(t));
-            charTimers = [];
-            // 重置所有字符为隐藏
-            charSpans.forEach(s => {
-              s.classList.remove('visible');
-              s.classList.remove('active-char');
-            });
-            startTyping(charSpans, cursor, innerDiv, bubble, syncedMs, onTypingDone);
+            charSpans.forEach(s => s.classList.remove('visible', 'active-char'));
+            startTypingRAF(charSpans, cursor, innerDiv, bubble, syncedMs, onDone);
           }
         };
 
         if (audio.readyState >= 1) {
-          setSyncedSpeed();
+          syncSpeed();
         } else {
-          audio.addEventListener('loadedmetadata', setSyncedSpeed, { once: true });
+          audio.addEventListener('loadedmetadata', syncSpeed, { once: true });
         }
-
         audio.play().catch(() => {});
       })
       .catch(() => {});
@@ -747,31 +751,55 @@ function showBubbleTyping(text) {
 }
 
 /**
- * 逐字显示动画，结束后调用 onDone
+ * 基于 requestAnimationFrame 的打字动画（替代 setTimeout，手机端流畅）
+ * 单个 rAF 循环驱动所有字符显示，不会创建数百个定时器
  */
-function startTyping(spans, cursor, container, bubble, msPerChar, onDone) {
-  let elapsed = 0;
-  for (let i = 0; i < spans.length; i++) {
-    const t = setTimeout(() => {
-      spans[i].classList.add('visible');
-      if (i > 0) spans[i-1].classList.remove('active-char');
-      spans[i].classList.add('active-char');
-      cursor.remove();
-      container.appendChild(cursor);
-      // 气泡内自动滚动
+function startTypingRAF(spans, cursor, container, bubble, msPerChar, onDone) {
+  if (typingRafId) {
+    cancelAnimationFrame(typingRafId);
+    typingRafId = null;
+  }
+
+  const cancelFlag = { cancelled: false };
+  let charIndex = 0;
+  let lastTime = performance.now();
+
+  function tick(now) {
+    if (cancelFlag.cancelled) return;
+
+    const delta = now - lastTime;
+    if (delta >= msPerChar) {
+      const steps = Math.floor(delta / msPerChar);
+      for (let s = 0; s < steps && charIndex < spans.length; s++) {
+        spans[charIndex].classList.add('visible');
+        if (charIndex > 0) spans[charIndex - 1].classList.remove('active-char');
+        spans[charIndex].classList.add('active-char');
+        charIndex++;
+      }
+      lastTime = now - (delta % msPerChar);
+
+      if (container.parentNode) {
+        container.appendChild(cursor);
+      }
       if (bubble.scrollHeight > bubble.clientHeight) {
         bubble.scrollTop = bubble.scrollHeight;
       }
-    }, elapsed);
-    charTimers.push(t);
-    elapsed += msPerChar;
+    }
+
+    if (charIndex < spans.length) {
+      typingRafId = requestAnimationFrame(tick);
+    } else {
+      typingRafId = null;
+      if (spans.length > 0) spans[spans.length - 1].classList.remove('active-char');
+      cursor.remove();
+      onDone();
+    }
   }
-  const endTimer = setTimeout(() => {
-    if (spans.length > 0) spans[spans.length-1].classList.remove('active-char');
-    cursor.remove();
-    onDone();
-  }, elapsed + 300);
-  charTimers.push(endTimer);
+
+  typingRafId = requestAnimationFrame(tick);
+
+  // 返回取消函数，供 syncSpeed 重启时使用
+  return () => { cancelFlag.cancelled = true; };
 }
 
 function addChatMsg(text, type) {
@@ -786,8 +814,6 @@ function addChatMsg(text, type) {
 // ===== 事件绑定 =====
 btnSend.addEventListener('click', sendMsg);
 userInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
-
-initRecognition();
 </script>
 </body>
 </html>
