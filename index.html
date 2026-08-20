@@ -454,6 +454,9 @@ async function sendMsg() {
 
     // 菜单/澄清类型 → 显示可点击按钮
     if ((data.type === 'menu' || data.type === 'clarify') && data.menu_items?.length) {
+      // 先设置文字（textContent 会清空子元素，必须在 appendChild 之前）
+      botDiv.textContent = data.answer.split('\n')[0];
+
       const menuDiv = document.createElement('div');
       menuDiv.className = 'chat-menu-options';
       for (const item of data.menu_items) {
@@ -468,7 +471,6 @@ async function sendMsg() {
       }
       botDiv.appendChild(menuDiv);
       chatMessages.scrollTop = chatMessages.scrollHeight;
-      botDiv.textContent = data.answer.split('\n')[0];
       return;
     }
 
