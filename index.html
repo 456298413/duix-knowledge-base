@@ -61,11 +61,51 @@
     font-weight: 300;
   }
 
+  .character-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
   .character-img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     object-position: center 45%;
+  }
+
+  /* 角色动画层 */
+  .character-anim-layer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  /* 呼吸动画 */
+  .character-anim-layer.idle .body-layer {
+    animation: bodyBreathe 4s ease-in-out infinite;
+  }
+
+  @keyframes bodyBreathe {
+    0%, 100% { transform: scale(1) translateY(0); }
+    50% { transform: scale(1.005) translateY(-2px); }
+  }
+
+  /* 眨眼动画 */
+  .eye-layer {
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    opacity: 0;
+    animation: blink 5s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 92%, 100% { opacity: 0; }
+    95%, 97% { opacity: 1; }
   }
 
   /* ===== 对话气泡 ===== */
@@ -83,8 +123,8 @@
     max-height: 50vh;
     word-break: break-all;
     opacity: 0;
-    transform: scale(0.85);
-    transition: opacity 0.35s ease, transform 0.35s ease;
+    transform: scale(0.95);
+    transition: opacity 0.12s ease, transform 0.12s ease;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08), 0 1px 4px rgba(231,76,60,0.1);
     overflow-y: auto;
     overflow-x: hidden;
@@ -119,7 +159,7 @@
   .bubble .tw-char {
     display: inline;
     opacity: 0;
-    transition: opacity 0.08s;
+    transition: opacity 0.03s;
   }
   .bubble .tw-char.visible {
     opacity: 1;
@@ -376,7 +416,12 @@
       <h1>安安 · 工会智能助手</h1>
       <div class="subtitle">维权帮扶 · 关爱职工 · 凝心聚力</div>
     </div>
-    <img class="character-img" src="character.png" alt="安安">
+    <div class="character-wrapper">
+      <img class="character-img" src="character.png" alt="安安">
+      <div class="character-anim-layer idle">
+        <div class="eye-layer"></div>
+      </div>
+    </div>
     <div class="bubble bubble-left" id="bubbleLeft"></div>
     <div class="bubble bubble-right" id="bubbleRight"></div>
   </div>
@@ -586,7 +631,6 @@ function showBubbleTyping(text) {
   const rounds = [];
   let buf = '';
   for (const para of paragraphs) {
-    // 跳过与下一段重复的短标题行（如"【目的意义】\n目的意义"）
     if (buf.length < 30 && para.trim() === buf.replace(/[【】\[\]]/g, '').trim()) {
       buf = para;
       continue;
@@ -599,7 +643,6 @@ function showBubbleTyping(text) {
     }
   }
   if (buf.trim()) rounds.push(buf.trim());
-  // 合并过短的首轮（避免只播标题的停顿）
   if (rounds.length > 1 && rounds[0].length < 30) {
     rounds[0] = rounds[0] + '\n' + rounds[1];
     rounds.splice(1, 1);
@@ -612,15 +655,11 @@ function showBubbleTyping(text) {
   charTimers = [];
   hideBubbles();
 
-  // 显示暂停按钮
   btnStop.classList.add('playing');
-
-  // 记录完整文本，供双击暂停时立即显示
   pendingFullText = text;
 
   // 在用户手势上下文中创建 Audio（移动端必须）
   const audio = new Audio();
-  audio.preload = 'auto';
   currentAudio = audio;
 
   let roundIdx = 0;
@@ -658,38 +697,50 @@ function showBubbleTyping(text) {
     cursor.className = 'tw-cursor';
     innerDiv.appendChild(cursor);
 
-    // 获取 TTS 音频并播放
-    let typingStarted = false;
+    // 初始打字速度：100ms/字，立即开始不等音频
+    let typingDone = false;
+    const onTypingDone = () => {
+      if (typingDone) return;
+      typingDone = true;
+      roundIdx++;
+      setTimeout(playRound, 600);
+    };
+
+    startTyping(charSpans, cursor, innerDiv, bubble, 100, onTypingDone);
+
+    // 同时请求并播放 TTS 音频，加载完后同步打字速度与音频时长
     fetch(`${API_BASE}/api/tts?text=${encodeURIComponent(rText)}`)
       .then(r => r.blob())
       .then(blob => {
         const url = URL.createObjectURL(blob);
         audio.src = url;
 
-        function beginTyping() {
-          if (typingStarted) return;
-          typingStarted = true;
-          const duration = audio.duration || 30;
-          const charMs = Math.max(50, Math.min(duration / rText.length * 1000, 400));
-          startTyping(charSpans, cursor, innerDiv, bubble, charMs, () => {
-            roundIdx++;
-            setTimeout(playRound, 600);
-          });
+        // 音频就绪后，根据音频时长重新计算打字速度
+        const setSyncedSpeed = () => {
+          const dur = audio.duration;
+          if (dur && dur > 0 && !typingDone) {
+            const syncedMs = Math.max(30, (dur * 1000) / rText.length);
+            // 重启打字动画，用与音频匹配的速度
+            charTimers.forEach(t => clearTimeout(t));
+            charTimers = [];
+            // 重置所有字符为隐藏
+            charSpans.forEach(s => {
+              s.classList.remove('visible');
+              s.classList.remove('active-char');
+            });
+            startTyping(charSpans, cursor, innerDiv, bubble, syncedMs, onTypingDone);
+          }
+        };
+
+        if (audio.readyState >= 1) {
+          setSyncedSpeed();
+        } else {
+          audio.addEventListener('loadedmetadata', setSyncedSpeed, { once: true });
         }
 
-        audio.oncanplaythrough = beginTyping;
-        audio.onloadeddata = () => setTimeout(beginTyping, 100);
-        audio.play().catch(() => {
-          beginTyping();
-        });
+        audio.play().catch(() => {});
       })
-      .catch(() => {
-        // TTS 失败也显示文字
-        startTyping(charSpans, cursor, innerDiv, bubble, 80, () => {
-          roundIdx++;
-          setTimeout(playRound, 600);
-        });
-      });
+      .catch(() => {});
   }
 
   playRound();
