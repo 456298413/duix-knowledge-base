@@ -73,74 +73,113 @@
     height: 100%;
     object-fit: cover;
     object-position: center 45%;
-    animation: idleBreath 4s ease-in-out infinite;
   }
 
-  /* 待机呼吸动画 */
-  @keyframes idleBreath {
+  /* 角色动画层 */
+  .character-anim-layer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  /* 呼吸动画 */
+  .character-anim-layer.idle .body-layer {
+    animation: bodyBreathe 4s ease-in-out infinite;
+  }
+
+  @keyframes bodyBreathe {
     0%, 100% { transform: scale(1) translateY(0); }
-    50% { transform: scale(1.008) translateY(-3px); }
+    50% { transform: scale(1.005) translateY(-2px); }
   }
 
-  /* 待机挥手/点头动画 - 叠加在图片上方 */
-  .character-wrapper::before {
-    content: '';
+  /* 眨眼动画 */
+  .eye-layer {
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    z-index: 2;
-    pointer-events: none;
-    animation: idleGlow 6s ease-in-out infinite;
-  }
-
-  @keyframes idleGlow {
-    0%, 100% { box-shadow: inset 0 0 0 rgba(255,200,150,0); }
-    50% { box-shadow: inset 0 0 30px rgba(255,200,150,0.08); }
-  }
-
-  /* 口型动画遮罩 */
-  .mouth-overlay {
-    position: absolute;
-    z-index: 5;
-    width: 3.2%;
-    height: 1.8%;
-    left: 50%;
-    top: 70%;
-    transform: translateX(-50%);
-    pointer-events: none;
-    border-radius: 50%;
-    background: radial-gradient(ellipse, rgba(180,60,60,0.7) 0%, rgba(150,40,40,0.5) 50%, transparent 70%);
+    left: 0; top: 0;
+    width: 100%; height: 100%;
     opacity: 0;
-    transition: opacity 0.15s;
+    animation: blink 5s ease-in-out infinite;
   }
 
-  .mouth-overlay.speaking {
-    opacity: 1;
-    animation: mouthMove 0.35s ease-in-out infinite;
+  @keyframes blink {
+    0%, 92%, 100% { opacity: 0; }
+    95%, 97% { opacity: 1; }
   }
 
-  @keyframes mouthMove {
-    0%, 100% { 
-      transform: translateX(-50%) scaleY(0.6) scaleX(0.9);
+  /* 嘴巴层 */
+  .mouth-layer {
+    position: absolute;
+    width: 4.5%;
+    height: 1.8%;
+    left: 48.5%;
+    top: 56%;
+    transform: translateX(-50%);
+    overflow: hidden;
+  }
+
+  .mouth-frame {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    transition: all 0.08s ease;
+  }
+
+  /* 待机微笑嘴型 */
+  .mouth-layer.smile .mouth-frame {
+    background: radial-gradient(ellipse at 50% 60%, 
+      rgba(200,90,80,0.6) 0%, 
+      rgba(210,110,100,0.3) 50%, 
+      transparent 70%);
+    transform: scaleY(0.3) scaleX(1.1);
+    border-radius: 0 0 50% 50%;
+  }
+
+  /* 说话嘴型 - JS音频分析驱动，CSS作为降级方案 */
+  .mouth-layer.speaking .mouth-frame {
+    animation: mouthCycle 0.3s steps(4) infinite;
+  }
+
+  /* 当JS音频分析生效时，覆盖CSS动画 */
+  .mouth-layer.speaking.audio-driven .mouth-frame {
+    animation: none;
+  }
+
+  @keyframes mouthCycle {
+    0% { 
+      background: radial-gradient(ellipse at 50% 50%, 
+        rgba(160,50,50,0.7) 0%, 
+        rgba(170,60,60,0.4) 60%, 
+        transparent 80%);
+      transform: scaleY(0.6) scaleX(0.9);
       border-radius: 50%;
     }
-    30% { 
-      transform: translateX(-50%) scaleY(1.4) scaleX(1.1);
-      border-radius: 40%;
-    }
-    60% { 
-      transform: translateX(-50%) scaleY(0.8) scaleX(1.0);
+    25% { 
+      background: radial-gradient(ellipse at 50% 50%, 
+        rgba(170,55,55,0.8) 0%, 
+        rgba(180,65,65,0.5) 60%, 
+        transparent 80%);
+      transform: scaleY(1.0) scaleX(1.05);
       border-radius: 45%;
     }
-  }
-
-  /* 待机微笑状态 - 不说话时显示 */
-  .mouth-overlay.smile {
-    opacity: 0.6;
-    animation: none;
-    transform: translateX(-50%) scaleY(0.4) scaleX(1.2);
-    border-radius: 0 0 50% 50%;
-    height: 1.2%;
-    background: radial-gradient(ellipse, rgba(220,100,100,0.45) 0%, rgba(200,80,80,0.25) 60%, transparent 80%);
+    50% { 
+      background: radial-gradient(ellipse at 50% 50%, 
+        rgba(165,52,52,0.75) 0%, 
+        rgba(175,62,62,0.45) 60%, 
+        transparent 80%);
+      transform: scaleY(0.7) scaleX(0.95);
+      border-radius: 48%;
+    }
+    75% { 
+      background: radial-gradient(ellipse at 50% 50%, 
+        rgba(175,58,58,0.85) 0%, 
+        rgba(185,68,68,0.55) 60%, 
+        transparent 80%);
+      transform: scaleY(1.1) scaleX(1.0);
+      border-radius: 42%;
+    }
   }
 
   /* ===== 对话气泡 ===== */
@@ -453,7 +492,12 @@
     </div>
     <div class="character-wrapper">
       <img class="character-img" src="character.png" alt="安安">
-      <div class="mouth-overlay smile" id="mouthOverlay"></div>
+      <div class="character-anim-layer idle">
+        <div class="eye-layer"></div>
+        <div class="mouth-layer smile" id="mouthLayer">
+          <div class="mouth-frame"></div>
+        </div>
+      </div>
     </div>
     <div class="bubble bubble-left" id="bubbleLeft"></div>
     <div class="bubble bubble-right" id="bubbleRight"></div>
@@ -504,16 +548,86 @@ const quickBar = document.getElementById('quickBar');
 let recognition = null;
 let charTimers = [];
 let currentAudio = null;
-const mouthOverlay = document.getElementById('mouthOverlay');
+const mouthLayer = document.getElementById('mouthLayer');
+const mouthFrame = document.querySelector('.mouth-frame');
+const animLayer = document.querySelector('.character-anim-layer');
+
+// 音频分析器
+let audioContext = null;
+let analyser = null;
+let audioSource = null;
+let animFrameId = null;
+
+function initAudioAnalyzer(audio) {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (!analyser) {
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.3;
+  }
+  if (!audioSource) {
+    audioSource = audioContext.createMediaElementSource(audio);
+    audioSource.connect(analyser);
+    analyser.connect(audioContext.destination);
+  }
+}
+
+function updateMouthFromAudio() {
+  if (!analyser || !mouthFrame) return;
+  
+  const dataArray = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(dataArray);
+  
+  // 计算音量 (RMS)
+  let sum = 0;
+  for (let i = 0; i < dataArray.length; i++) {
+    sum += dataArray[i];
+  }
+  const avg = sum / dataArray.length;
+  const volume = Math.min(avg / 128, 1); // 归一化到 0-1
+  
+  // 根据音量调整嘴巴开合度
+  const scaleY = 0.3 + volume * 0.9;
+  const scaleX = 0.9 + volume * 0.2;
+  const opacity = 0.4 + volume * 0.6;
+  
+  mouthFrame.style.transform = `scaleY(${scaleY}) scaleX(${scaleX})`;
+  mouthFrame.style.opacity = opacity;
+  
+  // 更新嘴型颜色深浅
+  const r = Math.floor(160 + volume * 30);
+  const g = Math.floor(50 + volume * 20);
+  const b = Math.floor(50 + volume * 20);
+  const a = 0.6 + volume * 0.3;
+  mouthFrame.style.background = `radial-gradient(ellipse at 50% 50%, 
+    rgba(${r},${g},${b},${a}) 0%, 
+    rgba(${r+20},${g+10},${b+10},${a*0.6}) 50%, 
+    transparent 80%)`;
+  
+  animFrameId = requestAnimationFrame(updateMouthFromAudio);
+}
 
 function setMouthSpeaking(speaking) {
-  if (!mouthOverlay) return;
+  if (!mouthLayer) return;
   if (speaking) {
-    mouthOverlay.classList.remove('smile');
-    mouthOverlay.classList.add('speaking');
+    mouthLayer.classList.remove('smile');
+    mouthLayer.classList.add('speaking');
+    if (animLayer) animLayer.classList.remove('idle');
   } else {
-    mouthOverlay.classList.remove('speaking');
-    mouthOverlay.classList.add('smile');
+    mouthLayer.classList.remove('speaking');
+    mouthLayer.classList.remove('audio-driven');
+    mouthLayer.classList.add('smile');
+    if (animLayer) animLayer.classList.add('idle');
+    // 清理音频分析
+    if (animFrameId) {
+      cancelAnimationFrame(animFrameId);
+      animFrameId = null;
+    }
+    mouthFrame.style.transform = '';
+    mouthFrame.style.opacity = '';
+    mouthFrame.style.background = '';
   }
 }
 
@@ -756,6 +870,13 @@ function showBubbleTyping(text) {
       .then(r => r.blob())
       .then(blob => {
         const url = URL.createObjectURL(blob);
+        
+        // 重新设置音频源时停止当前的分析动画
+        if (animFrameId) {
+          cancelAnimationFrame(animFrameId);
+          animFrameId = null;
+        }
+        
         audio.src = url;
 
         function beginTyping() {
@@ -772,7 +893,16 @@ function showBubbleTyping(text) {
         audio.oncanplaythrough = beginTyping;
         audio.onloadeddata = () => setTimeout(beginTyping, 100);
         setMouthSpeaking(true);
-        audio.play().catch(() => {
+        audio.play().then(() => {
+          try {
+            initAudioAnalyzer(audio);
+            mouthLayer.classList.add('audio-driven');
+            updateMouthFromAudio();
+          } catch(e) {
+            console.log('Audio analyzer not available, using CSS fallback');
+            mouthLayer.classList.remove('audio-driven');
+          }
+        }).catch(() => {
           beginTyping();
         });
       })
