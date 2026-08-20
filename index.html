@@ -68,67 +68,20 @@
     object-position: center 45%;
   }
 
-  /* ===== 对话气泡 ===== */
-  .bubble {
-    position: absolute;
-    z-index: 20;
-    background: rgba(255,255,255,0.96);
-    border: 2px solid #e74c3c;
-    border-radius: 16px;
-    padding: 14px 18px;
-    font-size: 0.88rem;
-    line-height: 1.75;
-    color: #333;
-    max-width: 15%;
-    max-height: 50vh;
-    word-break: break-all;
-    opacity: 0;
-    transform: scale(0.85);
-    transition: opacity 0.35s ease, transform 0.35s ease;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08), 0 1px 4px rgba(231,76,60,0.1);
-    overflow-y: auto;
-    overflow-x: hidden;
-    pointer-events: auto;
-  }
-
-  .bubble.visible {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  .bubble-left {
-    left: 1.5%;
-    top: 14%;
-    width: 28%;
-    max-width: 28%;
-    bottom: 45%;
-  }
-
-  .bubble-right {
-    right: 1.5%;
-    top: 14%;
-    width: 28%;
-    max-width: 28%;
-    bottom: 45%;
-  }
-
-  .bubble::-webkit-scrollbar { width: 3px; }
-  .bubble::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
-
-  /* 打字机效果 */
-  .bubble .tw-char {
+  /* ===== 打字机效果（聊天面板内） ===== */
+  .tw-char {
     display: inline;
     opacity: 0;
     transition: opacity 0.08s;
   }
-  .bubble .tw-char.visible {
+  .tw-char.visible {
     opacity: 1;
   }
-  .bubble .tw-char.active-char {
+  .tw-char.active-char {
     color: #d4380d;
     font-weight: 600;
   }
-  .bubble .tw-cursor {
+  .tw-cursor {
     display: inline-block;
     width: 2px;
     height: 1.1em;
@@ -140,64 +93,6 @@
   @keyframes blink {
     50% { opacity: 0; }
   }
-
-  /* 气泡溢出滚动动画 */
-  .bubble.scrolling-text {
-    animation: bubbleScroll linear infinite;
-    animation-play-state: paused;
-  }
-  .bubble.scrolling-text.do-scroll {
-    animation-play-state: running;
-  }
-  @keyframes bubbleScroll {
-    0%   { transform: translateY(0); }
-    100% { transform: translateY(-100%); }
-  }
-
-  /* ===== 粒子特效 ===== */
-  .particle-container {
-    position: absolute;
-    z-index: 15;
-    pointer-events: none;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-  }
-
-  .particle {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-    animation: particleFloat 2s ease-out forwards;
-  }
-
-  @keyframes particleFloat {
-    0% { opacity: 1; transform: translate(0,0) scale(1); }
-    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0); }
-  }
-
-  /* ===== 轮次指示器 ===== */
-  .round-dots {
-    position: absolute;
-    bottom: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 5px;
-    z-index: 25;
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-
-  .round-dots.visible { opacity: 1; }
-
-  .round-dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: #ddd;
-    transition: background 0.3s;
-  }
-
-  .round-dot.active { background: #d4380d; }
 
   /* ===== 右侧：聊天区域 ===== */
   .right-panel {
@@ -403,9 +298,6 @@
     .chat-header p { font-size: 0.7rem; }
     .chat-messages { padding: 10px 14px; gap: 10px; }
     .message { font-size: 0.85rem; padding: 10px 14px; }
-    .bubble { max-width: 40%; font-size: 0.75rem; padding: 8px 12px; }
-    .bubble-left { left: 2%; top: 10%; width: 40%; bottom: 50%; }
-    .bubble-right { right: 2%; top: 10%; width: 40%; bottom: 50%; }
     .quick-bar { padding: 6px 10px 2px; gap: 6px; }
     .quick-btn { font-size: 0.72rem; padding: 5px 10px; }
     .chat-input-area { padding: 8px 12px 12px; }
@@ -422,18 +314,13 @@
 <body>
 
 <div class="container">
-  <!-- 左侧：人物 + 气泡 -->
+  <!-- 左侧：人物 -->
   <div class="left-panel">
     <div class="header-bar">
       <h1>安安 · 工会智能助手</h1>
       <div class="subtitle">维权帮扶 · 关爱职工 · 凝心聚力</div>
     </div>
     <img class="character-img" src="character.png" alt="安安">
-
-    <div class="bubble bubble-left" id="bubbleLeft"></div>
-    <div class="bubble bubble-right" id="bubbleRight"></div>
-    <div class="particle-container" id="particleContainer"></div>
-    <div class="round-dots" id="roundDots"></div>
   </div>
 
   <!-- 右侧：聊天 -->
@@ -468,36 +355,15 @@
 
 <script>
 const API_BASE = 'https://web-production-55858.up.railway.app';
-const bubbleLeft = document.getElementById('bubbleLeft');
-const bubbleRight = document.getElementById('bubbleRight');
 const chatMessages = document.getElementById('chatMessages');
 const userInput = document.getElementById('userInput');
 const btnSend = document.getElementById('btnSend');
 const btnVoice = document.getElementById('btnVoice');
-const particleContainer = document.getElementById('particleContainer');
-const roundDots = document.getElementById('roundDots');
 const quickBar = document.getElementById('quickBar');
 
-let isSpeaking = false;
-let particleTimer = null;
 let recognition = null;
 let charTimers = [];
-let scrollAnimId = null;
-// pendingUtter 已废弃，改用 currentUtter（在 sendMsg 中同步创建并立即 speak）
-
-// ===== TTS 安全包装 =====
-// 检测浏览器是否支持 Web Speech API
-const ttsAvailable = typeof window.speechSynthesis !== 'undefined';
-
-// 安全调用 speechSynthesis 的方法
-const tts = {
-  cancel: () => ttsAvailable && window.speechSynthesis.cancel(),
-  resume: () => ttsAvailable && window.speechSynthesis.resume(),
-  speak: (utter) => ttsAvailable && window.speechSynthesis.speak(utter),
-  getVoices: () => ttsAvailable ? window.speechSynthesis.getVoices() : [],
-  get speaking() { return ttsAvailable && window.speechSynthesis.speaking; },
-  get pending() { return ttsAvailable && window.speechSynthesis.pending; }
-};
+let currentAudio = null;
 
 // ===== 快捷按钮 =====
 quickBar.addEventListener('click', (e) => {
@@ -508,18 +374,15 @@ quickBar.addEventListener('click', (e) => {
 });
 
 // ===== 语音识别 =====
-// 检测是否是手机端
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
 function initRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  // 更严格的兼容性检测：API存在 + 不是已知有问题的移动端浏览器
-  if (!SR) { 
-    btnVoice.style.display = 'none'; 
-    return; 
+  if (!SR) {
+    btnVoice.style.display = 'none';
+    return;
   }
-  
-  // 尝试创建 recognition 实例来验证是否真的可用
+
   try {
     recognition = new SR();
     recognition.lang = 'zh-CN';
@@ -527,31 +390,25 @@ function initRecognition() {
     recognition.onstart = () => btnVoice.classList.add('recording');
     recognition.onend = () => btnVoice.classList.remove('recording');
     recognition.onresult = e => { userInput.value = e.results[0][0].transcript; sendMsg(); };
-    recognition.onerror = (e) => { 
+    recognition.onerror = (e) => {
       btnVoice.classList.remove('recording');
-      // 如果启动失败，隐藏按钮
       if (e.error === 'not-supported' || e.error === 'no-speech') {
         btnVoice.style.display = 'none';
       }
     };
-    
-    // 在移动端，如果 API 存在但实际不可用，尝试启动一次来验证
+
     if (isMobile) {
-      // 延迟检测，避免阻塞页面加载
       setTimeout(() => {
         try {
           recognition.start();
-          // 如果能启动，立即停止
           setTimeout(() => recognition.stop(), 100);
         } catch(e) {
-          // 启动失败，隐藏按钮
           btnVoice.style.display = 'none';
           recognition = null;
         }
       }, 500);
     }
   } catch(e) {
-    // 创建失败，隐藏按钮
     btnVoice.style.display = 'none';
     recognition = null;
   }
@@ -559,7 +416,6 @@ function initRecognition() {
 
 btnVoice.addEventListener('click', () => {
   if (!recognition) {
-    // 不支持语音输入，给用户提示
     if (isMobile) {
       alert('当前浏览器不支持语音输入，请使用键盘输入');
     }
@@ -568,408 +424,7 @@ btnVoice.addEventListener('click', () => {
   btnVoice.classList.contains('recording') ? recognition.stop() : recognition.start();
 });
 
-// ===== 粒子特效 =====
-function startParticles() {
-  if (particleTimer) return;
-  particleTimer = setInterval(() => {
-    for (let i = 0; i < 3; i++) createParticle();
-  }, 80);
-}
-
-function stopParticles() {
-  clearInterval(particleTimer);
-  particleTimer = null;
-}
-
-function createParticle() {
-  const p = document.createElement('div');
-  p.className = 'particle';
-  const size = Math.random() * 6 + 3;
-  const colors = ['#ffd700','#ff6b6b','#87ceeb','#98fb98','#dda0dd','#f0e68c'];
-  const color = colors[Math.floor(Math.random() * colors.length)];
-  const active = bubbleLeft.classList.contains('visible') ? bubbleLeft : bubbleRight;
-  const rect = active.getBoundingClientRect();
-  const cRect = particleContainer.getBoundingClientRect();
-  const cx = rect.left - cRect.left + rect.width/2 + (Math.random()-0.5)*rect.width*0.8;
-  const cy = rect.top - cRect.top + rect.height/2 + (Math.random()-0.5)*rect.height*0.6;
-  p.style.cssText = `width:${size}px;height:${size}px;background:${color};left:${cx}px;top:${cy}px;--dx:${(Math.random()-0.5)*120}px;--dy:${(Math.random()-0.5)*120-30}px;`;
-  particleContainer.appendChild(p);
-  setTimeout(() => p.remove(), 2000);
-}
-
-// ===== 隐藏气泡 =====
-function hideBubbles() {
-  bubbleLeft.classList.remove('visible');
-  bubbleRight.classList.remove('visible');
-  bubbleLeft.innerHTML = '';
-  bubbleRight.innerHTML = '';
-  bubbleLeft.className = 'bubble bubble-left';
-  bubbleRight.className = 'bubble bubble-right';
-  roundDots.classList.remove('visible');
-  roundDots.innerHTML = '';
-  charTimers.forEach(t => clearTimeout(t));
-  charTimers = [];
-  if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
-}
-
-// ===== TTS 不可用时只显示气泡文字 =====
-function showBubblesOnly(text) {
-  hideBubbles();
-  charTimers.forEach(t => clearTimeout(t));
-  charTimers = [];
-  
-  const MAX_PER_SIDE = 180;
-  const paragraphs = text.split('\n').filter(p => p.trim());
-  const rounds = [];
-  let buf = '';
-  for (const para of paragraphs) {
-    if (buf && (buf.length + para.length + 1) > MAX_PER_SIDE) {
-      rounds.push(buf.trim());
-      buf = para;
-    } else {
-      buf += (buf ? '\n' : '') + para;
-    }
-  }
-  if (buf.trim()) rounds.push(buf.trim());
-  if (!rounds.length) rounds.push(text);
-  
-  let roundIdx = 0;
-  const MS_PER_CHAR = 120;
-  
-  function showRound() {
-    if (roundIdx >= rounds.length) {
-      setTimeout(() => { hideBubbles(); roundDots.classList.remove('visible'); }, 2000);
-      return;
-    }
-    
-    const rText = rounds[roundIdx];
-    const side = roundIdx % 2 === 0 ? 'left' : 'right';
-    hideBubbles();
-    const bubble = side === 'left' ? bubbleLeft : bubbleRight;
-    
-    const innerDiv = document.createElement('div');
-    innerDiv.style.cssText = 'position:relative;';
-    bubble.appendChild(innerDiv);
-    bubble.classList.add('visible');
-    
-    const charSpans = [];
-    for (let i = 0; i < rText.length; i++) {
-      const cs = document.createElement('span');
-      cs.className = 'tw-char';
-      cs.textContent = rText[i];
-      innerDiv.appendChild(cs);
-      charSpans.push(cs);
-    }
-    const cursor = document.createElement('span');
-    cursor.className = 'tw-cursor';
-    innerDiv.appendChild(cursor);
-    
-    const dots = roundDots.querySelectorAll('.round-dot');
-    dots.forEach((d, i) => d.classList.toggle('active', i === roundIdx));
-    
-    let elapsed = 0;
-    for (let i = 0; i < charSpans.length; i++) {
-      const t = setTimeout(() => {
-        charSpans[i].classList.add('visible');
-        if (i > 0) charSpans[i-1].classList.remove('active-char');
-        charSpans[i].classList.add('active-char');
-        cursor.remove();
-        innerDiv.appendChild(cursor);
-        if (bubble.scrollHeight > bubble.clientHeight) {
-          bubble.scrollTop = bubble.scrollHeight;
-        }
-      }, elapsed);
-      charTimers.push(t);
-      elapsed += MS_PER_CHAR;
-    }
-    
-    // 显示完后进入下一轮
-    const endTimer = setTimeout(() => {
-      if (charSpans.length > 0) charSpans[charSpans.length-1].classList.remove('active-char');
-      cursor.remove();
-      roundIdx++;
-      if (roundIdx < rounds.length) {
-        setTimeout(showRound, 800);
-      } else {
-        setTimeout(() => { hideBubbles(); roundDots.classList.remove('visible'); }, 2000);
-      }
-    }, elapsed + 500);
-    charTimers.push(endTimer);
-  }
-  
-  // 轮次指示器
-  if (rounds.length > 1) {
-    roundDots.innerHTML = '';
-    for (let i = 0; i < rounds.length; i++) {
-      const d = document.createElement('div');
-      d.className = 'round-dot' + (i === 0 ? ' active' : '');
-      roundDots.appendChild(d);
-    }
-    roundDots.classList.add('visible');
-  }
-  
-  showRound();
-}
-
-// ===== 语音播报 + 打字机逐字出现 =====
-// warmVoice: 如果传入了在手势上下文中创建的语音对象，复用它（不cancel）
-function speakAndShow(text, warmVoice) {
-  // 只有非 warmVoice 模式才 cancel，避免打断手势上下文中的语音
-  if (!warmVoice) {
-    tts.cancel();
-  }
-  hideBubbles();
-  stopParticles();
-  charTimers.forEach(t => clearTimeout(t));
-  charTimers = [];
-  if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
-
-  if (!text) return;
-  // 如果 TTS 不可用，只显示气泡和打字机效果
-  if (!ttsAvailable) {
-    // 只显示文字，不播报
-    showBubblesOnly(text);
-    return;
-  }
-
-  const MAX_PER_SIDE = 180;
-
-  // 按段落切分轮次
-  const paragraphs = text.split('\n').filter(p => p.trim());
-  const rounds = [];
-  let buf = '';
-  for (const para of paragraphs) {
-    if (buf && (buf.length + para.length + 1) > MAX_PER_SIDE) {
-      rounds.push(buf.trim());
-      buf = para;
-    } else {
-      buf += (buf ? '\n' : '') + para;
-    }
-  }
-  if (buf.trim()) rounds.push(buf.trim());
-  if (!rounds.length) rounds.push(text);
-
-  let roundIdx = 0;
-
-  // 轮次指示器
-  if (rounds.length > 1) {
-    roundDots.innerHTML = '';
-    for (let i = 0; i < rounds.length; i++) {
-      const d = document.createElement('div');
-      d.className = 'round-dot' + (i === 0 ? ' active' : '');
-      roundDots.appendChild(d);
-    }
-    roundDots.classList.add('visible');
-  }
-
-  // 获取语音
-  function getVoice() {
-    const voices = tts.getVoices();
-    const prefs = ['Microsoft Xiaoxiao','Xiaoxiao','Huihui','Microsoft Huihui','Google 普通话','Ting-Ting'];
-    let voice = null;
-    for (const name of prefs) {
-      voice = voices.find(v => v.name.includes(name) && v.lang.startsWith('zh'));
-      if (voice) break;
-    }
-    if (!voice) voice = voices.find(v => v.lang.startsWith('zh') && (v.name.includes('Female')||v.name.includes('女')));
-    if (!voice) voice = voices.find(v => v.lang.startsWith('zh'));
-    return voice;
-  }
-
-  const voice = getVoice();
-  const SPEECH_RATE = 0.92;
-  // 打字机速度：跟随语音节奏
-  const MS_PER_CHAR = 1000 / (4.5 * SPEECH_RATE);
-
-  function playRound() {
-    if (roundIdx >= rounds.length) {
-      setTimeout(() => { hideBubbles(); stopParticles(); roundDots.classList.remove('visible'); }, 1500);
-      return;
-    }
-
-    const rText = rounds[roundIdx];
-    const side = roundIdx % 2 === 0 ? 'left' : 'right';
-    hideBubbles();
-
-    const bubble = side === 'left' ? bubbleLeft : bubbleRight;
-
-    // 创建容器，每个字符一个span
-    const innerDiv = document.createElement('div');
-    innerDiv.style.cssText = 'position:relative;';
-    bubble.appendChild(innerDiv);
-    bubble.classList.add('visible');
-
-    // 逐字创建 span
-    const charSpans = [];
-    for (let i = 0; i < rText.length; i++) {
-      const cs = document.createElement('span');
-      cs.className = 'tw-char';
-      cs.textContent = rText[i];
-      innerDiv.appendChild(cs);
-      charSpans.push(cs);
-    }
-    // 光标
-    const cursor = document.createElement('span');
-    cursor.className = 'tw-cursor';
-    innerDiv.appendChild(cursor);
-
-    // 更新轮次指示器
-    const dots = roundDots.querySelectorAll('.round-dot');
-    dots.forEach((d, i) => d.classList.toggle('active', i === roundIdx));
-
-    isSpeaking = true;
-    startParticles();
-
-    // 检查是否需要滚动
-    const totalHeight = innerDiv.scrollHeight;
-    const visibleHeight = bubble.clientHeight;
-    const needsScroll = totalHeight > visibleHeight;
-
-    let currentChar = 0;
-    let scrollProgress = 0; // 0~1
-
-    // 滚动函数：从顶部慢慢滚到底部，循环
-    function startAutoScroll() {
-      if (!needsScroll) return;
-      bubble.scrollTop = 0;
-      const scrollDuration = charSpans.length * MS_PER_CHAR; // 与打字同步
-      const startTime = performance.now();
-      function step(now) {
-        const elapsed = now - startTime;
-        const progress = (elapsed % scrollDuration) / scrollDuration;
-        const maxScroll = innerDiv.scrollHeight - bubble.clientHeight;
-        bubble.scrollTop = progress * maxScroll;
-        scrollAnimId = requestAnimationFrame(step);
-      }
-      scrollAnimId = requestAnimationFrame(step);
-    }
-
-    // 逐字显示定时器
-    let elapsed = 0;
-    for (let i = 0; i < charSpans.length; i++) {
-      const t = setTimeout(() => {
-        charSpans[i].classList.add('visible');
-        // 高亮当前字
-        if (i > 0) charSpans[i-1].classList.remove('active-char');
-        charSpans[i].classList.add('active-char');
-        // 光标跟随
-        cursor.remove();
-        innerDiv.appendChild(cursor);
-        // 如果没有自动滚动，手动跟随滚动
-        if (!needsScroll) {
-          const cr = cursor.getBoundingClientRect();
-          const br = bubble.getBoundingClientRect();
-          if (cr.bottom > br.bottom - 10) {
-            bubble.scrollTop += cr.bottom - br.bottom + 20;
-          }
-        }
-      }, elapsed);
-      charTimers.push(t);
-      elapsed += MS_PER_CHAR;
-    }
-
-    // TTS 播报：第一轮复用预热语音对象（保持在手势上下文），后续轮次正常创建
-    let utter;
-    if (warmVoice && roundIdx === 0) {
-      // 复用预创建对象——它是在手势上下文中创建的，手机上只有它能播放
-      utter = warmVoice;
-      utter.text = rText;
-      // 重新设置 voice（预创建时 voices 可能还没加载好）
-      if (voice) utter.voice = voice;
-    } else {
-      utter = new SpeechSynthesisUtterance(rText);
-      utter.lang = 'zh-CN';
-      utter.rate = SPEECH_RATE;
-      utter.pitch = 1.1;
-      if (voice) utter.voice = voice;
-    }
-
-    // 语音开始后启动自动滚动
-    utter.onstart = () => { startAutoScroll(); };
-
-    utter.onend = () => {
-      isSpeaking = false;
-      stopParticles();
-      // 最后一个字也标记
-      if (charSpans.length > 0) {
-        charSpans[charSpans.length-1].classList.remove('active-char');
-      }
-      cursor.remove();
-      if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
-      roundIdx++;
-      if (roundIdx < rounds.length) {
-        setTimeout(playRound, 600);
-      } else {
-        setTimeout(() => { hideBubbles(); roundDots.classList.remove('visible'); }, 1500);
-      }
-    };
-
-    utter.onerror = () => {
-      isSpeaking = false;
-      stopParticles();
-      cursor.remove();
-      if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
-      hideBubbles();
-    };
-
-    // 确保引擎活跃后再 speak
-    tts.resume();
-    tts.speak(utter);
-
-    // 兜底方案：200ms后如果还没开始播放，用 AudioContext 生成提示音（手机端降级）
-    if (roundIdx === 0) {
-      const onendRef = utter.onend;
-      const onerrorRef = utter.onerror;
-      setTimeout(() => {
-        if (!tts.speaking && !tts.pending && isSpeaking) {
-          // TTS 没有成功播放，用 AudioContext 播放提示音
-          playBeep();
-          // 仍然执行 onend 回调，继续后续逻辑
-          if (onendRef) onendRef();
-        }
-      }, 200);
-    }
-  }
-
-  playRound();
-}
-
 // ===== 发送消息 =====
-// 关键：手机浏览器只允许在用户手势的同步代码中触发语音
-// 所以必须在 fetch 之前就调用 speak()，利用浏览器的语音队列机制
-let currentUtter = null; // 当前正在使用的语音对象
-// 手机端声音降级方案：用 AudioContext 生成提示音
-let audioContext = null;
-let ttsSupported = true; // 标记 TTS 是否可用
-
-function playBeep() {
-  try {
-    if (!audioContext) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    // 确保 AudioContext 被激活
-    if (audioContext.state === 'suspended') {
-      audioContext.resume();
-    }
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    oscillator.frequency.value = 800;
-    gainNode.gain.value = 0.3; // 提高音量
-    oscillator.start();
-    setTimeout(() => {
-      oscillator.stop();
-      oscillator.disconnect();
-      gainNode.disconnect();
-    }, 300);
-    return true;
-  } catch(e) {
-    console.log('AudioContext beep failed:', e);
-    return false;
-  }
-}
-
 async function sendMsg() {
   const text = userInput.value.trim();
   if (!text) return;
@@ -978,156 +433,180 @@ async function sendMsg() {
   addChatMsg(text, 'user');
   const loading = addChatMsg('安安正在查找…', 'bot');
 
-  // ===== 关键修复：在同步代码中立即触发语音 =====
-  // 手机浏览器只允许在用户手势的同步代码中触发 TTS
-  
-  // 在用户手势中直接播放提示音（用于激活 AudioContext）
-  if (ttsSupported && ttsAvailable) {
-    const beepSuccess = playBeep();
-    if (!beepSuccess) {
-      ttsSupported = false;
-    }
-  }
-  
-  if (ttsAvailable && ttsSupported) {
-    try {
-      tts.cancel();
-      currentUtter = new SpeechSynthesisUtterance('正在查询');
-      currentUtter.lang = 'zh-CN';
-      currentUtter.rate = 0.92;
-      currentUtter.pitch = 1.1;
-      // 设置语音
-      const voices = tts.getVoices();
-      const prefs = ['Microsoft Xiaoxiao','Xiaoxiao','Huihui','Microsoft Huihui','Google 普通话','Ting-Ting'];
-      for (const name of prefs) {
-        const v = voices.find(v => v.name.includes(name) && v.lang.startsWith('zh'));
-        if (v) { currentUtter.voice = v; break; }
-      }
-      
-      // 检测 TTS 是否真的可用：如果没有任何语音，标记为不支持
-      if (voices.length === 0) {
-        ttsSupported = false;
-        playBeep();
-      } else {
-        tts.speak(currentUtter);
-        // 300ms后检测是否开始播放，如果没有则标记为不支持
-        setTimeout(() => {
-          if (!tts.speaking && !tts.pending) {
-            ttsSupported = false;
-          }
-        }, 300);
-      }
-    } catch(e) { 
-      currentUtter = null;
-      ttsSupported = false;
-      playBeep();
-    }
-  } else {
-    // TTS 不支持，用提示音代替
-    playBeep();
-  }
-
   try {
     const resp = await fetch(`${API_BASE}/api/ask?question=${encodeURIComponent(text)}`);
     const data = await resp.json();
     loading.remove();
 
-    if (data.success && data.answer) {
-      const botDiv = addChatMsg(data.answer, 'bot');
-
-      if (data.source) {
-        const tag = document.createElement('span');
-        tag.className = 'source-tag';
-        tag.textContent = '📎 ' + data.source;
-        botDiv.appendChild(tag);
-      }
-
-      // 菜单/澄清类型 → 显示可点击按钮（不需要语音播报）
-      if ((data.type === 'menu' || data.type === 'clarify') && data.menu_items && data.menu_items.length) {
-        const menuDiv = document.createElement('div');
-        menuDiv.className = 'chat-menu-options';
-        for (const item of data.menu_items) {
-          const btn = document.createElement('button');
-          btn.className = 'chat-menu-btn';
-          btn.textContent = item.label;
-          btn.addEventListener('click', () => {
-            const sendText = item.key ? `__ENTRY__:${item.key}:${item.label}` : item.label;
-            userInput.value = sendText;
-            sendMsg();
-          });
-          menuDiv.appendChild(btn);
-        }
-        botDiv.appendChild(menuDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-        // 菜单类型：取消语音，显示文字即可
-        tts.cancel();
-        currentUtter = null;
-        bubbleLeft.textContent = data.answer.split('\n')[0];
-        bubbleRight.textContent = '';
-        bubbleLeft.classList.add('visible');
-        return;
-      }
-
-      // ===== 详情类型：用实际内容替换占位语音 =====
-      if (data.type === 'detail' && currentUtter && ttsAvailable) {
-        // 修改占位语音的文本为实际答案
-        currentUtter.text = data.answer;
-        // 重新设置语音（确保 voices 已加载）
-        const voices = tts.getVoices();
-        const prefs = ['Microsoft Xiaoxiao','Xiaoxiao','Huihui','Microsoft Huihui','Google 普通话','Ting-Ting'];
-        for (const name of prefs) {
-          const v = voices.find(v => v.name.includes(name) && v.lang.startsWith('zh'));
-          if (v) { currentUtter.voice = v; break; }
-        }
-        
-        let handled = false;
-        // 设置 onend 回调："正在查询"播完后自动播放实际答案
-        currentUtter.onend = () => {
-          if (!handled) {
-            handled = true;
-            // 此时在手势上下文中（因为是连续播放）
-            speakAndShow(data.answer, currentUtter);
-            currentUtter = null;
-          }
-        };
-        currentUtter.onerror = () => {
-          if (!handled) {
-            handled = true;
-            tts.cancel();
-            speakAndShow(data.answer);
-            currentUtter = null;
-          }
-        };
-        // 兜底：150ms 后如果 onend 还没触发，说明占位语音已经播完了
-        // 直接用新对象播放（此时已不在手势上下文，手机上可能失败，但至少文字能显示）
-        setTimeout(() => {
-          if (!handled) {
-            handled = true;
-            tts.cancel();
-            speakAndShow(data.answer);
-            currentUtter = null;
-          }
-        }, 150);
-      } else {
-        // 非 detail 类型或 currentUtter 为空或 TTS 不可用，直接显示
-        tts.cancel();
-        speakAndShow(data.answer);
-        currentUtter = null;
-      }
-
-    } else {
+    if (!data.success || !data.answer) {
       addChatMsg('抱歉，未找到相关信息。', 'bot');
-      tts.cancel();
-      currentUtter = null;
+      return;
     }
+
+    const botDiv = addChatMsg('', 'bot');
+
+    if (data.source) {
+      const tag = document.createElement('span');
+      tag.className = 'source-tag';
+      tag.textContent = '📎 ' + data.source;
+      botDiv.appendChild(tag);
+    }
+
+    // 菜单/澄清类型 → 显示可点击按钮
+    if ((data.type === 'menu' || data.type === 'clarify') && data.menu_items?.length) {
+      const menuDiv = document.createElement('div');
+      menuDiv.className = 'chat-menu-options';
+      for (const item of data.menu_items) {
+        const btn = document.createElement('button');
+        btn.className = 'chat-menu-btn';
+        btn.textContent = item.label;
+        btn.addEventListener('click', () => {
+          userInput.value = item.key ? `__ENTRY__:${item.key}:${item.label}` : item.label;
+          sendMsg();
+        });
+        menuDiv.appendChild(btn);
+      }
+      botDiv.appendChild(menuDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      botDiv.textContent = data.answer.split('\n')[0];
+      return;
+    }
+
+    // 详情类型：打字机 + 后端 TTS 音频
+    typeInPanel(data.answer, botDiv);
+
   } catch (err) {
     loading.remove();
-    // 显示详细错误信息，方便排查
-    const errMsg = err.message || String(err);
-    addChatMsg(`网络连接失败: ${errMsg}`, 'bot');
-    tts.cancel();
-    currentUtter = null;
+    addChatMsg(`网络连接失败: ${err.message}`, 'bot');
   }
+}
+
+/**
+ * 在聊天面板中逐字显示文本，同时用后端 TTS 播放语音
+ * Audio 对象在用户点击手势上下文中创建（移动端要求）
+ */
+function typeInPanel(text, messageDiv) {
+  const MAX_PER_ROUND = 180;
+  const paragraphs = text.split('\n').filter(p => p.trim());
+  const rounds = [];
+  let buf = '';
+  for (const para of paragraphs) {
+    if (buf && (buf.length + para.length + 1) > MAX_PER_ROUND) {
+      rounds.push(buf.trim());
+      buf = para;
+    } else {
+      buf += (buf ? '\n' : '') + para;
+    }
+  }
+  if (buf.trim()) rounds.push(buf.trim());
+  if (!rounds.length) rounds.push(text);
+
+  // 停止之前的音频和动画
+  if (currentAudio) { currentAudio.pause(); currentAudio.remove(); currentAudio = null; }
+  charTimers.forEach(t => clearTimeout(t));
+  charTimers = [];
+
+  // 在用户手势上下文中立即创建 Audio 对象（移动端必须）
+  const audio = new Audio();
+  audio.preload = 'auto';
+  currentAudio = audio;
+
+  let roundIdx = 0;
+
+  function playRound() {
+    if (roundIdx >= rounds.length) {
+      if (currentAudio) { currentAudio.remove(); currentAudio = null; }
+      return;
+    }
+
+    const rText = rounds[roundIdx];
+
+    // 保留 source-tag，清空其他内容
+    const existingTag = messageDiv.querySelector('.source-tag');
+    messageDiv.innerHTML = '';
+    if (existingTag) messageDiv.appendChild(existingTag);
+
+    const innerDiv = document.createElement('div');
+    messageDiv.prepend(innerDiv);
+
+    const charSpans = [];
+    for (let i = 0; i < rText.length; i++) {
+      const cs = document.createElement('span');
+      cs.className = 'tw-char';
+      cs.textContent = rText[i];
+      innerDiv.appendChild(cs);
+      charSpans.push(cs);
+    }
+    const cursor = document.createElement('span');
+    cursor.className = 'tw-cursor';
+    innerDiv.appendChild(cursor);
+
+    // 获取 TTS 音频并播放
+    let typingStarted = false;
+    fetch(`${API_BASE}/api/tts?text=${encodeURIComponent(rText)}`)
+      .then(r => r.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        audio.src = url;
+
+        function beginTyping() {
+          if (typingStarted) return;
+          typingStarted = true;
+          const duration = audio.duration || 30;
+          const charMs = Math.max(50, Math.min(duration / rText.length * 1000, 400));
+          startTyping(charSpans, cursor, innerDiv, charMs, () => {
+            roundIdx++;
+            setTimeout(playRound, 400);
+          });
+        }
+
+        audio.oncanplaythrough = beginTyping;
+        audio.onloadeddata = () => setTimeout(beginTyping, 100);
+        audio.play().catch(() => {
+          // autoplay 被阻止时，直接用固定速度显示
+          beginTyping();
+        });
+      })
+      .catch(() => {
+        // TTS 失败也显示文字（无声音）
+        startTyping(charSpans, cursor, innerDiv, 80, () => {
+          roundIdx++;
+          setTimeout(playRound, 400);
+        });
+      });
+  }
+
+  playRound();
+}
+
+/**
+ * 逐字显示动画，结束后调用 onDone
+ */
+function startTyping(spans, cursor, container, msPerChar, onDone) {
+  let elapsed = 0;
+  for (let i = 0; i < spans.length; i++) {
+    const t = setTimeout(() => {
+      spans[i].classList.add('visible');
+      if (i > 0) spans[i-1].classList.remove('active-char');
+      spans[i].classList.add('active-char');
+      cursor.remove();
+      container.appendChild(cursor);
+      // 自动跟随滚动
+      const cr = cursor.getBoundingClientRect();
+      const mr = container.parentElement.getBoundingClientRect();
+      if (cr.bottom > mr.bottom - 10) {
+        container.parentElement.scrollTop += cr.bottom - mr.bottom + 20;
+      }
+    }, elapsed);
+    charTimers.push(t);
+    elapsed += msPerChar;
+  }
+  const endTimer = setTimeout(() => {
+    if (spans.length > 0) spans[spans.length-1].classList.remove('active-char');
+    cursor.remove();
+    onDone();
+  }, elapsed + 300);
+  charTimers.push(endTimer);
 }
 
 function addChatMsg(text, type) {
@@ -1142,9 +621,6 @@ function addChatMsg(text, type) {
 // ===== 事件绑定 =====
 btnSend.addEventListener('click', sendMsg);
 userInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
-if (ttsAvailable) {
-  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-}
 
 initRecognition();
 </script>
