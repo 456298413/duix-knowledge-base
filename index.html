@@ -175,9 +175,9 @@
     background: #d4380d;
     margin-left: 2px;
     vertical-align: text-bottom;
-    animation: blink 0.6s step-end infinite;
+    animation: cursorBlink 0.6s step-end infinite;
   }
-  @keyframes blink {
+  @keyframes cursorBlink {
     50% { opacity: 0; }
   }
 
@@ -330,22 +330,6 @@
 
   .btn-send:hover { transform: scale(1.05); box-shadow: 0 3px 12px rgba(212,56,13,0.3); }
 
-  .btn-voice {
-    width: 44px; height: 44px;
-    border-radius: 50%;
-    border: 1.5px solid #ddd;
-    background: #fff;
-    color: #666;
-    font-size: 1.1rem;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
-    flex-shrink: 0;
-  }
-
-  .btn-voice:hover { border-color: #d4380d; color: #d4380d; }
-  .btn-voice.recording { background: #d4380d; color: #fff; border-color: #d4380d; animation: pulse 1s infinite; }
-
   .btn-stop {
     width: 44px; height: 44px;
     border-radius: 50%;
@@ -362,11 +346,6 @@
   }
   .btn-stop.playing { display: flex; }
   .btn-stop:hover { background: #d4380d; color: #fff; }
-
-  @keyframes pulse {
-    0%,100% { box-shadow: 0 0 0 0 rgba(212,56,13,0.4); }
-    50% { box-shadow: 0 0 0 10px rgba(212,56,13,0); }
-  }
 
   /* ===== 响应式 ===== */
   @media (max-width: 768px) {
@@ -394,12 +373,12 @@
     .message { font-size: 0.85rem; padding: 10px 14px; }
     /* 手机端气泡：移到聊天区上方，不遮人物 */
     .bubble { max-width: 40%; font-size: 0.75rem; padding: 8px 12px; }
-    .bubble-left, .bubble-right { left: auto; right: 2%; top: 4px; width: 36%; bottom: auto; max-height: 28vh; }
+    .bubble-left, .bubble-right { left: auto; right: 2%; top: 4px; width: 36%; max-height: 28vh; }
     .quick-bar { padding: 6px 10px 2px; gap: 6px; }
     .quick-btn { font-size: 0.72rem; padding: 5px 10px; }
     .chat-input-area { padding: 8px 12px 12px; }
     .chat-input-area input { padding: 10px 14px; font-size: 0.85rem; }
-    .btn-send, .btn-voice, .btn-stop { width: 38px; height: 38px; font-size: 1rem; }
+    .btn-send, .btn-stop { width: 38px; height: 38px; font-size: 1rem; }
   }
   @media (max-width: 380px) {
     .left-panel { flex: 0 0 28vh; min-height: 160px; }
@@ -449,7 +428,6 @@
       <button class="quick-btn" data-q="工会福利">工会福利</button>
     </div>
     <div class="chat-input-area">
-      <button class="btn-voice" id="btnVoice" title="语音输入">🎤</button>
       <button class="btn-stop" id="btnStop" title="暂停播报">⏸</button>
       <input type="text" id="userInput" placeholder="输入你的问题…" autocomplete="off">
       <button class="btn-send" id="btnSend" title="发送">▶</button>
@@ -464,18 +442,11 @@ const bubbleRight = document.getElementById('bubbleRight');
 const chatMessages = document.getElementById('chatMessages');
 const userInput = document.getElementById('userInput');
 const btnSend = document.getElementById('btnSend');
-const btnVoice = document.getElementById('btnVoice');
 const btnStop = document.getElementById('btnStop');
 const quickBar = document.getElementById('quickBar');
 
 let currentAudio = null;
 let typingRafId = null;
-
-// 录音状态
-let mediaRecorder = null;
-let audioChunks = [];
-let isRecording = false;
-let mediaStream = null;
 
 // ===== 快捷按钮 =====
 quickBar.addEventListener('click', (e) => {
@@ -483,67 +454,6 @@ quickBar.addEventListener('click', (e) => {
   if (!btn) return;
   userInput.value = btn.dataset.q;
   sendMsg();
-});
-
-// ===== 语音输入（MediaRecorder 录音 + 后端转写） =====
-async function startVoiceRecording() {
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    audioChunks = [];
-    mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
-    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-    mediaRecorder.onstop = async () => {
-      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-      if (mediaStream) {
-        mediaStream.getTracks().forEach(t => t.stop());
-        mediaStream = null;
-      }
-      btnVoice.classList.remove('recording');
-      isRecording = false;
-      btnVoice.textContent = '🎤';
-      // 发送到后端转文字
-      try {
-        btnVoice.style.opacity = '0.5';
-        btnVoice.style.pointerEvents = 'none';
-        const formData = new FormData();
-        formData.append('audio', audioBlob, 'voice.webm');
-        const resp = await fetch(`${API_BASE}/api/stt`, { method: 'POST', body: formData });
-        const data = await resp.json();
-        btnVoice.style.opacity = '';
-        btnVoice.style.pointerEvents = '';
-        if (data.success && data.text) {
-          userInput.value = data.text;
-          sendMsg();
-        } else {
-          alert('语音识别失败：' + (data.error || '未识别到内容'));
-        }
-      } catch (err) {
-        btnVoice.style.opacity = '';
-        btnVoice.style.pointerEvents = '';
-        alert('语音识别请求失败：' + err.message);
-      }
-    };
-    mediaRecorder.start();
-    isRecording = true;
-    btnVoice.classList.add('recording');
-    btnVoice.textContent = '⏹';
-  } catch (err) {
-    alert('无法访问麦克风，请在浏览器设置中允许麦克风权限\n\n' + err.message);
-  }
-}
-
-function stopVoiceRecording() {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop();
-  }
-}
-
-btnVoice.addEventListener('click', () => {
-  if (isRecording) {
-    stopVoiceRecording();
-  } else {
-    startVoiceRecording();
-  }
 });
 
 // ===== 暂停播报按钮 =====
@@ -721,27 +631,11 @@ function showBubbleTyping(text) {
 
     startTypingRAF(charSpans, cursor, innerDiv, bubble, 100, onDone);
 
-    // 同时请求 TTS 音频，加载后按音频时长同步打字速度
+    // 同时请求 TTS 音频
     fetch(`${API_BASE}/api/tts?text=${encodeURIComponent(rText)}`)
       .then(r => r.blob())
       .then(blob => {
-        const url = URL.createObjectURL(blob);
-        audio.src = url;
-
-        const syncSpeed = () => {
-          const dur = audio.duration;
-          if (dur && dur > 0 && !done) {
-            const syncedMs = Math.max(30, (dur * 1000) / rText.length);
-            charSpans.forEach(s => s.classList.remove('visible', 'active-char'));
-            startTypingRAF(charSpans, cursor, innerDiv, bubble, syncedMs, onDone);
-          }
-        };
-
-        if (audio.readyState >= 1) {
-          syncSpeed();
-        } else {
-          audio.addEventListener('loadedmetadata', syncSpeed, { once: true });
-        }
+        audio.src = URL.createObjectURL(blob);
         audio.play().catch(() => {});
       })
       .catch(() => {});
@@ -797,9 +691,6 @@ function startTypingRAF(spans, cursor, container, bubble, msPerChar, onDone) {
   }
 
   typingRafId = requestAnimationFrame(tick);
-
-  // 返回取消函数，供 syncSpeed 重启时使用
-  return () => { cancelFlag.cancelled = true; };
 }
 
 function addChatMsg(text, type) {
