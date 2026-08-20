@@ -8,7 +8,8 @@ import re
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from io import BytesIO
-from gtts import gTTS
+import asyncio
+from edge_tts import Communicate
 
 app = Flask(__name__)
 CORS(app)
@@ -711,14 +712,21 @@ def ask():
 
 @app.route('/api/tts', methods=['GET'])
 def tts_api():
-    """将文本转为 MP3 音频返回，前端用 Audio 元素播放"""
+    """将文本转为 MP3 音频返回（温柔女声 XiaoxiaoNeural）"""
     text = request.args.get('text', '').strip()
     if not text:
         return jsonify({'success': False, 'error': 'text is required'}), 400
     try:
-        tts = gTTS(text=text, lang='zh-CN', slow=False)
-        buf = BytesIO()
-        tts.write_to_fp(buf)
+        async def _generate():
+            communicate = Communicate(text, "zh-CN-XiaoxiaoNeural", rate="-5%", pitch="+2Hz")
+            chunks = []
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    chunks.append(chunk["data"])
+            return b''.join(chunks)
+
+        audio_data = asyncio.run(_generate())
+        buf = BytesIO(audio_data)
         buf.seek(0)
         return send_file(buf, mimetype='audio/mpeg', as_attachment=False,
                          download_name='tts.mp3')
