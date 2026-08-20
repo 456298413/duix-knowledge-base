@@ -485,6 +485,20 @@ let charTimers = [];
 let scrollAnimId = null;
 // pendingUtter 已废弃，改用 currentUtter（在 sendMsg 中同步创建并立即 speak）
 
+// ===== TTS 安全包装 =====
+// 检测浏览器是否支持 Web Speech API
+const ttsAvailable = typeof window.speechSynthesis !== 'undefined';
+
+// 安全调用 speechSynthesis 的方法
+const tts = {
+  cancel: () => ttsAvailable && window.speechSynthesis.cancel(),
+  resume: () => ttsAvailable && window.speechSynthesis.resume(),
+  speak: (utter) => ttsAvailable && window.speechSynthesis.speak(utter),
+  getVoices: () => ttsAvailable ? window.speechSynthesis.getVoices() : [],
+  get speaking() { return ttsAvailable && window.speechSynthesis.speaking; },
+  get pending() { return ttsAvailable && window.speechSynthesis.pending; }
+};
+
 // ===== 快捷按钮 =====
 quickBar.addEventListener('click', (e) => {
   const btn = e.target.closest('.quick-btn');
@@ -598,12 +612,111 @@ function hideBubbles() {
   if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
 }
 
+// ===== TTS 不可用时只显示气泡文字 =====
+function showBubblesOnly(text) {
+  hideBubbles();
+  charTimers.forEach(t => clearTimeout(t));
+  charTimers = [];
+  
+  const MAX_PER_SIDE = 180;
+  const paragraphs = text.split('\n').filter(p => p.trim());
+  const rounds = [];
+  let buf = '';
+  for (const para of paragraphs) {
+    if (buf && (buf.length + para.length + 1) > MAX_PER_SIDE) {
+      rounds.push(buf.trim());
+      buf = para;
+    } else {
+      buf += (buf ? '\n' : '') + para;
+    }
+  }
+  if (buf.trim()) rounds.push(buf.trim());
+  if (!rounds.length) rounds.push(text);
+  
+  let roundIdx = 0;
+  const MS_PER_CHAR = 120;
+  
+  function showRound() {
+    if (roundIdx >= rounds.length) {
+      setTimeout(() => { hideBubbles(); roundDots.classList.remove('visible'); }, 2000);
+      return;
+    }
+    
+    const rText = rounds[roundIdx];
+    const side = roundIdx % 2 === 0 ? 'left' : 'right';
+    hideBubbles();
+    const bubble = side === 'left' ? bubbleLeft : bubbleRight;
+    
+    const innerDiv = document.createElement('div');
+    innerDiv.style.cssText = 'position:relative;';
+    bubble.appendChild(innerDiv);
+    bubble.classList.add('visible');
+    
+    const charSpans = [];
+    for (let i = 0; i < rText.length; i++) {
+      const cs = document.createElement('span');
+      cs.className = 'tw-char';
+      cs.textContent = rText[i];
+      innerDiv.appendChild(cs);
+      charSpans.push(cs);
+    }
+    const cursor = document.createElement('span');
+    cursor.className = 'tw-cursor';
+    innerDiv.appendChild(cursor);
+    
+    const dots = roundDots.querySelectorAll('.round-dot');
+    dots.forEach((d, i) => d.classList.toggle('active', i === roundIdx));
+    
+    let elapsed = 0;
+    for (let i = 0; i < charSpans.length; i++) {
+      const t = setTimeout(() => {
+        charSpans[i].classList.add('visible');
+        if (i > 0) charSpans[i-1].classList.remove('active-char');
+        charSpans[i].classList.add('active-char');
+        cursor.remove();
+        innerDiv.appendChild(cursor);
+        if (bubble.scrollHeight > bubble.clientHeight) {
+          bubble.scrollTop = bubble.scrollHeight;
+        }
+      }, elapsed);
+      charTimers.push(t);
+      elapsed += MS_PER_CHAR;
+    }
+    
+    // 显示完后进入下一轮
+    const endTimer = setTimeout(() => {
+      if (charSpans.length > 0) charSpans[charSpans.length-1].classList.remove('active-char');
+      cursor.remove();
+      roundIdx++;
+      if (roundIdx < rounds.length) {
+        setTimeout(showRound, 800);
+      } else {
+        setTimeout(() => { hideBubbles(); roundDots.classList.remove('visible'); }, 2000);
+      }
+    }, elapsed + 500);
+    charTimers.push(endTimer);
+  }
+  
+  // 轮次指示器
+  if (rounds.length > 1) {
+    roundDots.innerHTML = '';
+    for (let i = 0; i < rounds.length; i++) {
+      const d = document.createElement('div');
+      d.className = 'round-dot' + (i === 0 ? ' active' : '');
+      roundDots.appendChild(d);
+    }
+    roundDots.classList.add('visible');
+  }
+  
+  showRound();
+}
+
 // ===== 语音播报 + 打字机逐字出现 =====
 // warmVoice: 如果传入了在手势上下文中创建的语音对象，复用它（不cancel）
 function speakAndShow(text, warmVoice) {
   // 只有非 warmVoice 模式才 cancel，避免打断手势上下文中的语音
   if (!warmVoice) {
-    window.speechSynthesis.cancel();
+    tts.cancel();
   }
   hideBubbles();
   stopParticles();
@@ -611,7 +724,13 @@ function speakAndShow(text, warmVoice) {
   charTimers = [];
   if (scrollAnimId) { cancelAnimationFrame(scrollAnimId); scrollAnimId = null; }
 
-  if (!text || !window.speechSynthesis) return;
+  if (!text) return;
+  // 如果 TTS 不可用，只显示气泡和打字机效果
+  if (!ttsAvailable) {
+    // 只显示文字，不播报
+    showBubblesOnly(text);
+    return;
+  }
 
   const MAX_PER_SIDE = 180;
 
@@ -645,7 +764,7 @@ function speakAndShow(text, warmVoice) {
 
   // 获取语音
   function getVoice() {
-    const voices = window.speechSynthesis.getVoices();
+    const voices = tts.getVoices();
     const prefs = ['Microsoft Xiaoxiao','Xiaoxiao','Huihui','Microsoft Huihui','Google 普通话','Ting-Ting'];
     let voice = null;
     for (const name of prefs) {
@@ -794,15 +913,15 @@ function speakAndShow(text, warmVoice) {
     };
 
     // 确保引擎活跃后再 speak
-    window.speechSynthesis.resume();
-    window.speechSynthesis.speak(utter);
+    tts.resume();
+    tts.speak(utter);
 
     // 兜底方案：200ms后如果还没开始播放，用 AudioContext 生成提示音（手机端降级）
     if (roundIdx === 0) {
       const onendRef = utter.onend;
       const onerrorRef = utter.onerror;
       setTimeout(() => {
-        if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending && isSpeaking) {
+        if (!tts.speaking && !tts.pending && isSpeaking) {
           // TTS 没有成功播放，用 AudioContext 播放提示音
           playBeep();
           // 仍然执行 onend 回调，继续后续逻辑
@@ -863,22 +982,22 @@ async function sendMsg() {
   // 手机浏览器只允许在用户手势的同步代码中触发 TTS
   
   // 在用户手势中直接播放提示音（用于激活 AudioContext）
-  if (ttsSupported) {
+  if (ttsSupported && ttsAvailable) {
     const beepSuccess = playBeep();
     if (!beepSuccess) {
       ttsSupported = false;
     }
   }
   
-  if (window.speechSynthesis && ttsSupported) {
+  if (ttsAvailable && ttsSupported) {
     try {
-      window.speechSynthesis.cancel();
+      tts.cancel();
       currentUtter = new SpeechSynthesisUtterance('正在查询');
       currentUtter.lang = 'zh-CN';
       currentUtter.rate = 0.92;
       currentUtter.pitch = 1.1;
       // 设置语音
-      const voices = window.speechSynthesis.getVoices();
+      const voices = tts.getVoices();
       const prefs = ['Microsoft Xiaoxiao','Xiaoxiao','Huihui','Microsoft Huihui','Google 普通话','Ting-Ting'];
       for (const name of prefs) {
         const v = voices.find(v => v.name.includes(name) && v.lang.startsWith('zh'));
@@ -890,10 +1009,10 @@ async function sendMsg() {
         ttsSupported = false;
         playBeep();
       } else {
-        window.speechSynthesis.speak(currentUtter);
+        tts.speak(currentUtter);
         // 300ms后检测是否开始播放，如果没有则标记为不支持
         setTimeout(() => {
-          if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
+          if (!tts.speaking && !tts.pending) {
             ttsSupported = false;
           }
         }, 300);
@@ -941,7 +1060,7 @@ async function sendMsg() {
         botDiv.appendChild(menuDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
         // 菜单类型：取消语音，显示文字即可
-        window.speechSynthesis.cancel();
+        tts.cancel();
         currentUtter = null;
         bubbleLeft.textContent = data.answer.split('\n')[0];
         bubbleRight.textContent = '';
@@ -950,11 +1069,11 @@ async function sendMsg() {
       }
 
       // ===== 详情类型：用实际内容替换占位语音 =====
-      if (data.type === 'detail' && currentUtter) {
+      if (data.type === 'detail' && currentUtter && ttsAvailable) {
         // 修改占位语音的文本为实际答案
         currentUtter.text = data.answer;
         // 重新设置语音（确保 voices 已加载）
-        const voices = window.speechSynthesis.getVoices();
+        const voices = tts.getVoices();
         const prefs = ['Microsoft Xiaoxiao','Xiaoxiao','Huihui','Microsoft Huihui','Google 普通话','Ting-Ting'];
         for (const name of prefs) {
           const v = voices.find(v => v.name.includes(name) && v.lang.startsWith('zh'));
@@ -974,7 +1093,7 @@ async function sendMsg() {
         currentUtter.onerror = () => {
           if (!handled) {
             handled = true;
-            window.speechSynthesis.cancel();
+            tts.cancel();
             speakAndShow(data.answer);
             currentUtter = null;
           }
@@ -984,21 +1103,21 @@ async function sendMsg() {
         setTimeout(() => {
           if (!handled) {
             handled = true;
-            window.speechSynthesis.cancel();
+            tts.cancel();
             speakAndShow(data.answer);
             currentUtter = null;
           }
         }, 150);
       } else {
-        // 非 detail 类型或 currentUtter 为空，直接播放
-        window.speechSynthesis.cancel();
+        // 非 detail 类型或 currentUtter 为空或 TTS 不可用，直接显示
+        tts.cancel();
         speakAndShow(data.answer);
         currentUtter = null;
       }
 
     } else {
       addChatMsg('抱歉，未找到相关信息。', 'bot');
-      window.speechSynthesis.cancel();
+      tts.cancel();
       currentUtter = null;
     }
   } catch (err) {
@@ -1006,7 +1125,7 @@ async function sendMsg() {
     // 显示详细错误信息，方便排查
     const errMsg = err.message || String(err);
     addChatMsg(`网络连接失败: ${errMsg}`, 'bot');
-    window.speechSynthesis.cancel();
+    tts.cancel();
     currentUtter = null;
   }
 }
@@ -1023,7 +1142,9 @@ function addChatMsg(text, type) {
 // ===== 事件绑定 =====
 btnSend.addEventListener('click', sendMsg);
 userInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
-window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+if (ttsAvailable) {
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
 
 initRecognition();
 </script>
