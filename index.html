@@ -1003,7 +1003,9 @@ async function sendMsg() {
     }
   } catch (err) {
     loading.remove();
-    addChatMsg('网络连接失败，请稍后重试。', 'bot');
+    // 显示详细错误信息，方便排查
+    const errMsg = err.message || String(err);
+    addChatMsg(`网络连接失败: ${errMsg}`, 'bot');
     window.speechSynthesis.cancel();
     currentUtter = null;
   }
