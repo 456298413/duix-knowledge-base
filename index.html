@@ -155,16 +155,16 @@
   .bubble::-webkit-scrollbar { width: 3px; }
   .bubble::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
 
-  /* 打字机效果 */
-  .bubble .tw-char {
+  /* 打字机效果（气泡内 + 聊天消息内通用） */
+  .tw-char {
     display: inline;
     opacity: 0;
     transition: opacity 0.03s;
   }
-  .bubble .tw-char.visible {
+  .tw-char.visible {
     opacity: 1;
   }
-  .bubble .tw-char.active-char {
+  .tw-char.active-char {
     color: #d4380d;
     font-weight: 600;
   }
@@ -537,7 +537,6 @@ function startChatTyping(text, onDone) {
         charIdx++;
       }
       lastT = now - (dt % 80);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     if (charIdx < chars.length) {
       typingRafId = requestAnimationFrame(tick);
