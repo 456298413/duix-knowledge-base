@@ -296,35 +296,17 @@
   }
 
   /* ===== 表格快捷栏 ===== */
-  .table-quick-bar {
-    padding: 2px 16px 4px;
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    border-top: 1px solid #f0f0f0;
-    scrollbar-width: thin;
-  }
-  .table-quick-bar::-webkit-scrollbar { height: 3px; }
-  .table-quick-bar::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
-  .table-quick-label {
-    font-size: 0.72rem;
-    color: #999;
-    padding: 7px 0;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
   .table-quick-btn {
-    padding: 4px 10px;
+    padding: 7px 14px;
     border: 1.5px solid #e85d2e;
-    border-radius: 14px;
+    border-radius: 18px;
     background: #fff;
     color: #e85d2e;
-    font-size: 0.72rem;
+    font-size: 0.82rem;
     cursor: pointer;
     transition: all 0.2s;
     font-family: inherit;
     white-space: nowrap;
-    flex-shrink: 0;
   }
   .table-quick-btn:hover {
     background: #e85d2e;
@@ -351,6 +333,52 @@
   .download-link:hover {
     background: #d4380d;
     color: #fff;
+  }
+
+  /* ===== 表格下载列表（聊天面板内） ===== */
+  .table-download-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .table-list-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1.5px solid #e74c3c;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    color: #333;
+    font-size: 0.85rem;
+  }
+  .table-list-item:hover {
+    background: #d4380d;
+    color: #fff;
+    border-color: #d4380d;
+    transform: translateX(4px);
+  }
+  .table-list-item .dl-icon {
+    flex-shrink: 0;
+    font-size: 1rem;
+  }
+  .table-list-item .dl-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .table-list-item .dl-btn {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    opacity: 0.7;
+  }
+  .table-list-item:hover .dl-btn {
+    opacity: 1;
   }
 
   .chat-input-area {
@@ -434,9 +462,6 @@
     .bubble-left, .bubble-right { left: auto; right: 2%; top: 4px; width: 36%; max-height: 28vh; }
     .quick-bar { padding: 6px 10px 2px; gap: 6px; }
     .quick-btn { font-size: 0.72rem; padding: 5px 10px; }
-    .table-quick-bar { padding: 2px 10px 4px; gap: 4px; }
-    .table-quick-btn { font-size: 0.65rem; padding: 3px 8px; }
-    .table-quick-label { font-size: 0.65rem; }
     .chat-input-area { padding: 8px 12px 12px; }
     .chat-input-area input { padding: 10px 14px; font-size: 0.85rem; }
     .btn-send, .btn-stop { width: 38px; height: 38px; font-size: 1rem; }
@@ -444,6 +469,11 @@
   @media (max-width: 380px) {
     .left-panel { flex: 0 0 28vh; min-height: 160px; }
     .header-bar h1 { font-size: 1.1rem; letter-spacing: 2px; }
+  }
+  /* 手机端表格下载列表 */
+  @media (max-width: 768px) {
+    .table-list-item { padding: 6px 10px; font-size: 0.78rem; }
+    .table-list-item .dl-name { font-size: 0.78rem; }
   }
 </style>
 </head>
@@ -488,20 +518,8 @@
       <button class="quick-btn" data-q="三不让帮扶救助">三不让帮扶救助</button>
       <button class="quick-btn" data-q="工会福利">工会福利</button>
     </div>
-    <div class="table-quick-bar">
-      <span class="table-quick-label">📋 表格下载：</span>
-      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-01:困难申请审批表">困难申请审批表</button>
-      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-02:困难职工名册">困难职工名册</button>
-      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-03:困难职工档案">困难职工档案</button>
-      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-04:职工困难救济情况汇总表">困难救济汇总表</button>
-      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-05:困难职工子女助学申请表">子女助学申请表</button>
-      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-06:困难职工子女助学情况汇总表">助学情况汇总表</button>
-      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-07:住院治疗费用救助申请审批表">住院费用救助表</button>
-      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-08:大病医疗互助保障一次性补助申请表">大病补助申请表</button>
-      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-09:职工医疗救助情况汇总表">医疗救助汇总表</button>
-      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-10:一次性生育补助申领表">生育补助申领表</button>
-      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-11:三不让医疗互助合作保障会会员名册">互助保障会名册</button>
-      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-12:三不让帮扶救助工作年报表">帮扶救助年报表</button>
+    <div class="quick-bar" id="tableQuickBar" style="border-top:none;padding-top:2px;">
+      <button class="quick-btn" id="btnTableDownload">📋 表格下载</button>
     </div>
     <div class="chat-input-area">
       <button class="btn-stop" id="btnStop" title="暂停播报">⏸</button>
@@ -531,6 +549,63 @@ quickBar.addEventListener('click', (e) => {
   userInput.value = btn.dataset.q;
   sendMsg();
 });
+
+// ===== 表格下载按钮 =====
+const btnTableDownload = document.getElementById('btnTableDownload');
+if (btnTableDownload) {
+  btnTableDownload.addEventListener('click', () => {
+    const tables = [
+      { id: 'sbr-form-01', name: '附件1 困难申请审批表', file: '附件1困难申请审批表.doc' },
+      { id: 'sbr-form-02', name: '附件2 困难职工名册', file: '附件2困难职工名册.xls' },
+      { id: 'sbr-form-03', name: '附件3 困难职工档案', file: '附件3困难职工档案.doc' },
+      { id: 'sbr-form-04', name: '附件4 职工困难救济情况汇总表', file: '附件4职工困难救济情况汇总表.xls' },
+      { id: 'sbr-form-05', name: '附件5 困难职工子女助学申请表', file: '附件5困难职工子女助学申请表.doc' },
+      { id: 'sbr-form-06', name: '附件6 困难职工子女助学情况汇总表', file: '附件6困难职工子女助学情况汇总表.xls' },
+      { id: 'sbr-form-07', name: '附件7 住院治疗费用救助申请（审批、支付）通知书', file: '附件7住院治疗费用救助申请（审批、支付）通知书.doc' },
+      { id: 'sbr-form-08', name: '附件8 大病医疗互助保障一次性补助申请（审批、支付）通知书', file: '附件8大病医疗互助保障一次性补助申请（审批、支付）通知书.doc' },
+      { id: 'sbr-form-09', name: '附件9 职工医疗救助情况汇总表', file: '附件9职工医疗救助情况汇总表.xls' },
+      { id: 'sbr-form-10', name: '附件10 一次性生育补助申领表', file: '附件10一次性生育补助申领表.doc' },
+      { id: 'sbr-form-11', name: '附件11 "三不让"医疗互助合作保障会会员名册', file: '附件11三不让医疗互助合作保障会会员名册.doc' },
+      { id: 'sbr-form-12', name: '附件12 "三不让"帮扶救助工作年报表', file: '附件12三不让帮扶救助工作年报表.doc' },
+    ];
+
+    // 在聊天面板中显示表格下载列表
+    const msgDiv = addChatMsg('📋 三不让帮扶救助表格下载', 'bot');
+
+    const listDiv = document.createElement('div');
+    listDiv.className = 'table-download-list';
+
+    const baseUrl = 'https://raw.githubusercontent.com/4532984133/duix-knowledge-base/main/table_files/';
+
+    for (const t of tables) {
+      const a = document.createElement('a');
+      a.className = 'table-list-item';
+      a.href = baseUrl + encodeURIComponent(t.file);
+      a.target = '_blank';
+      a.download = t.file;
+
+      const icon = document.createElement('span');
+      icon.className = 'dl-icon';
+      icon.textContent = '📄';
+
+      const name = document.createElement('span');
+      name.className = 'dl-name';
+      name.textContent = t.name;
+
+      const btn = document.createElement('span');
+      btn.className = 'dl-btn';
+      btn.textContent = '下载 ↓';
+
+      a.appendChild(icon);
+      a.appendChild(name);
+      a.appendChild(btn);
+      listDiv.appendChild(a);
+    }
+
+    msgDiv.appendChild(listDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  });
+}
 
 // ===== 暂停播报按钮 =====
 btnStop.addEventListener('click', () => stopPlayback());
