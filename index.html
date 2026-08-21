@@ -295,6 +295,64 @@
     color: #fff;
   }
 
+  /* ===== 表格快捷栏 ===== */
+  .table-quick-bar {
+    padding: 2px 16px 4px;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    border-top: 1px solid #f0f0f0;
+    scrollbar-width: thin;
+  }
+  .table-quick-bar::-webkit-scrollbar { height: 3px; }
+  .table-quick-bar::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+  .table-quick-label {
+    font-size: 0.72rem;
+    color: #999;
+    padding: 7px 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .table-quick-btn {
+    padding: 4px 10px;
+    border: 1.5px solid #e85d2e;
+    border-radius: 14px;
+    background: #fff;
+    color: #e85d2e;
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .table-quick-btn:hover {
+    background: #e85d2e;
+    color: #fff;
+  }
+
+  /* ===== 下载链接 ===== */
+  .download-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: #fff3f0;
+    border: 1.5px solid #d4380d;
+    border-radius: 8px;
+    color: #d4380d;
+    font-size: 0.82rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: fit-content;
+  }
+  .download-link:hover {
+    background: #d4380d;
+    color: #fff;
+  }
+
   .chat-input-area {
     padding: 10px 20px 16px;
     display: flex;
@@ -376,6 +434,9 @@
     .bubble-left, .bubble-right { left: auto; right: 2%; top: 4px; width: 36%; max-height: 28vh; }
     .quick-bar { padding: 6px 10px 2px; gap: 6px; }
     .quick-btn { font-size: 0.72rem; padding: 5px 10px; }
+    .table-quick-bar { padding: 2px 10px 4px; gap: 4px; }
+    .table-quick-btn { font-size: 0.65rem; padding: 3px 8px; }
+    .table-quick-label { font-size: 0.65rem; }
     .chat-input-area { padding: 8px 12px 12px; }
     .chat-input-area input { padding: 10px 14px; font-size: 0.85rem; }
     .btn-send, .btn-stop { width: 38px; height: 38px; font-size: 1rem; }
@@ -409,7 +470,7 @@
   <div class="right-panel">
     <div class="chat-header">
       <h2>💬 与轶安安对话</h2>
-      <p>基于中铁二局工会文件知识库 · 154条专业问答</p>
+      <p>基于中铁二局工会文件知识库 · 166条专业问答</p>
     </div>
     <div class="chat-messages" id="chatMessages">
       <div class="message bot">你好！我是轶安安，中铁二局工会智能助手 🌸
@@ -426,6 +487,21 @@
       <button class="quick-btn" data-q="财务管理办法">财务管理办法</button>
       <button class="quick-btn" data-q="三不让帮扶救助">三不让帮扶救助</button>
       <button class="quick-btn" data-q="工会福利">工会福利</button>
+    </div>
+    <div class="table-quick-bar">
+      <span class="table-quick-label">📋 表格下载：</span>
+      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-01:困难申请审批表">困难申请审批表</button>
+      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-02:困难职工名册">困难职工名册</button>
+      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-03:困难职工档案">困难职工档案</button>
+      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-04:职工困难救济情况汇总表">困难救济汇总表</button>
+      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-05:困难职工子女助学申请表">子女助学申请表</button>
+      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-06:困难职工子女助学情况汇总表">助学情况汇总表</button>
+      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-07:住院治疗费用救助申请审批表">住院费用救助表</button>
+      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-08:大病医疗互助保障一次性补助申请表">大病补助申请表</button>
+      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-09:职工医疗救助情况汇总表">医疗救助汇总表</button>
+      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-10:一次性生育补助申领表">生育补助申领表</button>
+      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-11:三不让医疗互助合作保障会会员名册">互助保障会名册</button>
+      <button class="table-quick-btn" data-q="__ENTRY__:sbr-form-12:三不让帮扶救助工作年报表">帮扶救助年报表</button>
     </div>
     <div class="chat-input-area">
       <button class="btn-stop" id="btnStop" title="暂停播报">⏸</button>
@@ -585,6 +661,10 @@ async function sendMsg() {
   if (!text) return;
   userInput.value = '';
 
+  // 检测是否为表格条目查询（用于添加下载链接）
+  const entryIdMatch = text.match(/^__ENTRY__:(sbr-form-\d+):/);
+  const entryId = entryIdMatch ? entryIdMatch[1] : null;
+
   addChatMsg(text.replace(/^__ENTRY__:[^:]+:/, ''), 'user');
   const loading = addChatMsg('安安正在查找…', 'bot');
 
@@ -597,6 +677,42 @@ async function sendMsg() {
       addChatMsg('抱歉，未找到相关信息。', 'bot');
       return;
     }
+
+    // 表格条目回答后添加下载链接
+    const addDownloadLink = () => {
+      if (entryId) {
+        const downloadUrls = {
+          'sbr-form-01': '附件1困难申请审批表.doc',
+          'sbr-form-02': '附件2困难职工名册.xls',
+          'sbr-form-03': '附件3困难职工档案.doc',
+          'sbr-form-04': '附件4职工困难救济情况汇总表.xls',
+          'sbr-form-05': '附件5困难职工子女助学申请表.doc',
+          'sbr-form-06': '附件6困难职工子女助学情况汇总表.xls',
+          'sbr-form-07': '附件7住院治疗费用救助申请（审批、支付）通知书.doc',
+          'sbr-form-08': '附件8大病医疗互助保障一次性补助申请（审批、支付）通知书.doc',
+          'sbr-form-09': '附件9职工医疗救助情况汇总表.xls',
+          'sbr-form-10': '附件10一次性生育补助申领表.doc',
+          'sbr-form-11': '附件11三不让医疗互助合作保障会会员名册.doc',
+          'sbr-form-12': '附件12三不让帮扶救助工作年报表.doc',
+        };
+        const fileName = downloadUrls[entryId];
+        if (fileName) {
+          // detail 类型的回答显示在气泡里，聊天面板没有 bot 消息，需要先创建一条
+          let lastBot = chatMessages.querySelector('.message.bot:last-child');
+          if (!lastBot || lastBot.textContent.includes('安安正在查找')) {
+            lastBot = addChatMsg('已为您找到相关表格信息：', 'bot');
+          }
+          const link = document.createElement('a');
+          link.className = 'download-link';
+          link.href = `https://raw.githubusercontent.com/4532984133/duix-knowledge-base/main/table_files/${encodeURIComponent(fileName)}`;
+          link.target = '_blank';
+          link.download = fileName;
+          link.innerHTML = '📥 下载文件：' + fileName;
+          lastBot.appendChild(document.createElement('br'));
+          lastBot.appendChild(link);
+        }
+      }
+    };
 
     // 菜单/澄清类型 → 右侧聊天面板显示可点击按钮
     if ((data.type === 'menu' || data.type === 'clarify') && data.menu_items?.length) {
@@ -620,7 +736,8 @@ async function sendMsg() {
       return;
     }
 
-    // 详情类型 → 左侧气泡打字机 + 后端 TTS 音频
+    // 详情类型 → 添加下载链接 + 左侧气泡打字机 + 后端 TTS 音频
+    addDownloadLink();
     showBubbleTyping(data.answer);
 
   } catch (err) {

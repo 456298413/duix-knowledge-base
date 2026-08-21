@@ -601,6 +601,7 @@ def ask():
                         'type': 'detail',
                         'answer': result['answer'],
                         'source': result['source'],
+                        'entry_id': entry_id,
                     })
             # 解析失败，去掉前缀继续正常流程
             question = parts[2] if len(parts) > 2 else question
